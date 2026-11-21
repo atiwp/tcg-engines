@@ -2,6 +2,9 @@ import { describe, expect, test } from "vite-plus/test";
 import type { OPCard } from "@tcg/op-types";
 import { allCards, cardCatalog, getAllCards, getCard, hasCard } from "../src/index.ts";
 import * as cardDefinitions from "../src/cards/index.ts";
+// OP Practice local cards (fork-only).
+import * as localCardDefinitions from "../src/cards/local/index.ts";
+import { localCardIdsDefinedUpstream } from "../src/index.ts";
 
 function isCardDefinition(value: unknown): value is OPCard {
   if (!value || typeof value !== "object") {
@@ -37,7 +40,11 @@ describe("@tcg/op-cards", () => {
     // the OP15–OP17 import. The upper bound catches accidental duplication.
     expect(allCards.length).toBeGreaterThan(1900);
     expect(allCards.length).toBeLessThan(3000);
-    expect(allCards.length).toBe(authoredCards.length);
+    // OP Practice local cards (fork-only): allCards also holds local cards upstream lacks.
+    const localAdded =
+      Object.values(localCardDefinitions).filter(isCardDefinition).length -
+      localCardIdsDefinedUpstream.length;
+    expect(allCards.length).toBe(authoredCards.length + localAdded);
     expect(getAllCards()).toHaveLength(allCards.length);
   });
 

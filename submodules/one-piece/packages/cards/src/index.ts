@@ -6,6 +6,8 @@ import {
   registerCards,
 } from "./runtime-catalog.ts";
 import * as cardDefinitions from "./cards/index.ts";
+// OP Practice local cards (fork-only).
+import * as localCardDefinitions from "./cards/local/index.ts";
 
 function isCardDefinition(value: unknown): value is OPCard {
   if (!value || typeof value !== "object") {
@@ -24,6 +26,21 @@ for (const value of Object.values(cardDefinitions)) {
 
   uniqueCards.set(value.id, value);
 }
+
+// OP Practice local cards (fork-only): added only when upstream lacks the id, so the
+// engine's own definition always wins. Returns the local ids upstream now defines.
+export function addLocalCards(cards: Map<string, OPCard>, local: Iterable<unknown>): string[] {
+  const definedUpstream: string[] = [];
+  for (const value of local) {
+    if (!isCardDefinition(value)) continue;
+    if (cards.has(value.id)) definedUpstream.push(value.id);
+    else cards.set(value.id, value);
+  }
+  return definedUpstream;
+}
+export const localCardIdsDefinedUpstream: readonly string[] = Object.freeze(
+  addLocalCards(uniqueCards, Object.values(localCardDefinitions)),
+);
 
 export const allCards = Object.freeze(
   [...uniqueCards.values()].sort((left, right) => left.id.localeCompare(right.id)),
@@ -49,6 +66,8 @@ export function hasCard(id: string): boolean {
 }
 
 export * from "./cards/index.ts";
+// OP Practice local cards (fork-only).
+export * from "./cards/local/index.ts";
 export * from "./deck-validation.ts";
 export { legacyPrintingIdAliases } from "./legacy-printing-id-aliases.generated.ts";
 export * from "./preconstructed-decks.ts";

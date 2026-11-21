@@ -15,19 +15,27 @@ const NON_DEFINITION_FILES = new Set([join(CARDS_SRC, "st01-helpers.ts")]);
 
 const problems = [];
 
-function walk(dir) {
+// OP Practice local cards (fork-only): src/cards/local/<type>/ follows the same layout rules.
+const LOCAL_CARDS = join(CARDS_SRC, "local");
+
+function walk(dir, root = CARDS_SRC) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
+    if (path === join(LOCAL_CARDS, "LOCAL-CARDS.md")) continue;
     if (entry.isDirectory()) {
+      if (path === LOCAL_CARDS) {
+        walk(path, path);
+        continue;
+      }
       if (!TYPE_DIRS.has(entry.name)) {
         problems.push(`legacy directory under src/cards: ${entry.name}/`);
         continue;
       }
-      walk(path);
+      walk(path, root);
       continue;
     }
     if (NON_DEFINITION_FILES.has(path) || entry.name === "index.ts") continue;
-    if (path.slice(CARDS_SRC.length + 1).split("/").length !== 2) {
+    if (path.slice(root.length + 1).split("/").length !== 2) {
       problems.push(
         `card file not directly under a type directory: ${path.slice(CARDS_SRC.length + 1)}`,
       );
