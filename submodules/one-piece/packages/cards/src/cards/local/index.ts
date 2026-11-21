@@ -1,4 +1,4 @@
-// OP Practice local cards (fork-only): EB05 definitions the pinned engine lacks.
+// OP Practice local cards (fork-only): EB05 and OP18 definitions the pinned engine lacks.
 // Registered by src/index.ts only when upstream does not define the same id. See LOCAL-CARDS.md.
 export { localEb05Alvida021 } from "./characters/eb05-021-alvida.ts";
 export { localEb05BoaHancock028 } from "./characters/eb05-028-boa-hancock.ts";
@@ -12,3 +12,15 @@ export { localEb05NicoRobin010 } from "./leaders/eb05-010-nico-robin.ts";
 export { localEb05NicoRobin016 } from "./characters/eb05-016-nico-robin.ts";
 export { localEb05Nojiko057 } from "./characters/eb05-057-nojiko.ts";
 export { localEb05Ripley047 } from "./characters/eb05-047-ripley.ts";
+export { localOp18AbyssPentagram097 } from "./stages/op18-097-abyss-pentagram.ts";
+export { localOp18Cerberus085 } from "./characters/op18-085-cerberus.ts";
+export { localOp18ILlMakeTheCall096 } from "./events/op18-096-i-ll-make-the-call.ts";
+export { localOp18IMLateIMVeryLate095 } from "./events/op18-095-i-m-late-i-m-very-late.ts";
+export { localOp18SaintGunko060 } from "./leaders/op18-060-saint-gunko.ts";
+export { localOp18SaintGunko065 } from "./characters/op18-065-saint-gunko.ts";
+export { localOp18SaintGunko084 } from "./characters/op18-084-saint-gunko.ts";
+export { localOp18SaintKillingham064 } from "./characters/op18-064-saint-killingham.ts";
+export { localOp18SaintKillingham083 } from "./characters/op18-083-saint-killingham.ts";
+export { localOp18SaintShamrock119 } from "./characters/op18-119-saint-shamrock.ts";
+export { localOp18SaintSommers088 } from "./characters/op18-088-saint-sommers.ts";
+export { localOp18Sleeptids093 } from "./characters/op18-093-sleeptids.ts";

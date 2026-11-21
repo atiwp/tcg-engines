@@ -3,19 +3,29 @@
 Card definitions the pinned engine lacks, added for the OP Practice app in the fork
 `atiwp/tcg-engines` only. They are not meant for upstream as-is.
 
-- **Source:** optcgapi.com card data (name, type, colour, cost, power, counter, life, attribute,
+- **EB05 source:** optcgapi.com card data (name, type, colour, cost, power, counter, life, attribute,
   types, effect text), saved 2026-11-21. Effect text is copied verbatim (including the printed
   typo "If your have" on EB05-057). optcgapi's `(NNN)` name suffix is dropped, as upstream does.
   Types are optcgapi's space-joined `sub_types`, split on the engine's existing type names.
   `imageUrl` follows optcgapi's `Card_Images/<id>.jpg` pattern and is unverified (OP Practice
   never loads it).
+- **OP18 source:** card text typed by the user from oplaytcg.com/en/sets/OP18 on 2026-11-21
+  (`.work/local-cards-op18.md` in OP Practice), image-checked by the OP Practice lead for all but
+  OP18-083 (text only). Text is copied as typed. The Leader's rarity (L) is not in the data; every
+  Leader prints L. Rarity "U" is the engine's "UC". OP18-065's printed "?" attribute uses
+  `attribute: "?"` like upstream OP13-079. OP18-093's any-number-of-copies text uses
+  `deckBuildingRules: [{ rule: "unlimitedCopies" }]` like upstream OP01-075. `imageUrl` follows the
+  official `cardlist/card/<id>.png` pattern and is unverified (OP Practice never loads it).
 - **Effects:** written only with the existing effect DSL, copying the encoding of upstream cards
   with the same wording. No engine rules code was changed.
 - **Upstream wins:** `src/index.ts` adds a local card only when no upstream definition has its id
   (`addLocalCards`); `localCardIdsDefinedUpstream` lists local ids upstream now defines. Delete
   those files when updating the engine.
 - **Tests:** `packages/cards/tests/local-cards.test.ts` (registration, upstream wins) and
-  `packages/engine/src/cards/local/eb05-local-cards.test.ts` (each card played through the engine).
+  `packages/engine/src/cards/local/{eb05,op18}-local-cards.test.ts` (each card played through the
+  engine).
+
+## EB05
 
 | Card     | Name                | Supported                                                                                                                                                                                        | Not supported                                                                                                                       |
 | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -31,3 +41,20 @@ Card definitions the pinned engine lacks, added for the OP Practice app in the f
 | EB05-055 | Nami                | All: [Your Turn] [On Play] Wisdom-Leader deck-to-Life; [Trigger] trash 1: with ≤2 Life play this card                                                                                            | —                                                                                                                                   |
 | EB05-056 | Nico Olvia          | All: [On Play] trash a [Trigger] card: with a [Nico Robin] Leader draw 2; [Trigger] play this card                                                                                               | —                                                                                                                                   |
 | EB05-057 | Nojiko              | All: [Activate: Main] [Once Per Turn] give 1 rested DON!! to a "Special"/"Wisdom" Leader or Character; [Trigger] with ≤2 Life play a ≤6000-power [Trigger] Character from hand                   | —                                                                                                                                   |
+
+## OP18
+
+| Card     | Name                      | Supported                                                                                                                                                                                 | Not supported                                                                                                                                                     |
+| -------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP18-060 | Saint Gunko (Leader)      | All: [Once Per Turn] a Character played from your trash: draw 2, trash 1; [Activate: Main] [Once Per Turn] trash 1: with an 8000+ base power Character add 1 active DON!!                 | —                                                                                                                                                                 |
+| OP18-064 | Saint Killingham          | [Your Turn] [On Play] DON!! −1: two opposing Characters (≤7000 / ≤5000 base power) cannot attack until the end of the opponent's next End Phase; [On K.O.] DON!! −1: play this from trash | The two "up to 1" picks are not forced to be different Characters (`cannotAttack` has no `targetGroups`); choosing the same one twice only wastes the second pick |
+| OP18-065 | Saint Gunko               | All: [Blocker]; [On Play] DON!! −1: play a ≤6000-power Celestial Dragons Character from trash                                                                                             | —                                                                                                                                                                 |
+| OP18-083 | Saint Killingham          | All: [Your Turn] [On Play] play a [Sleeptids] from trash; [On K.O.] trash 2: play this from trash                                                                                         | —                                                                                                                                                                 |
+| OP18-084 | Saint Gunko               | All: [On Play] top 4, add a Holy Knights of God card, trash the rest; [Activate: Main] rest 4 DON!!: play a cost ≤6 Holy Knights of God Character from trash                              | —                                                                                                                                                                 |
+| OP18-085 | Cerberus                  | All: [Activate: Main] return this to hand: a [Saint Shamrock] gains [Rush], [Banish] or [Unblockable] this turn                                                                           | —                                                                                                                                                                 |
+| OP18-088 | Saint Sommers             | All: [Your Turn] [On Play] with 6+ DON!! K.O. a base cost ≤4 Character; [On K.O.] trash 2: play this from trash                                                                           | —                                                                                                                                                                 |
+| OP18-093 | Sleeptids                 | All: any number of copies; [Blocker]                                                                                                                                                      | —                                                                                                                                                                 |
+| OP18-095 | I'm Late, I'm Very Late!! | All: [Main] Celestial Dragons Leader: top 5, add a [Sleeptids] or Holy Knights of God card; [Trigger] activate [Main]                                                                     | —                                                                                                                                                                 |
+| OP18-096 | I'll Make the Call        | All: [Main] rest 3 DON!!: play a cost ≤6 Holy Knights of God Character from trash; [Counter] 10+ trash: +4000 this battle                                                                 | —                                                                                                                                                                 |
+| OP18-097 | Abyss Pentagram           | All: Celestial Dragons Leader: Holy Knights of God / Five Elders Characters cost 2+ cost 1 less from hand; [On Play] draw 1, trash 2 from deck top                                        | —                                                                                                                                                                 |
+| OP18-119 | Saint Shamrock            | All: [On K.O.] trash 1: play this from trash; [Activate: Main] [Once Per Turn] if played this turn, play a cost ≤6 Holy Knights of God Character from trash                               | —                                                                                                                                                                 |

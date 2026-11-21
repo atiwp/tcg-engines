@@ -7,6 +7,7 @@ import {
   getCard,
   hasCard,
   localCardIdsDefinedUpstream,
+  validateDeckForFormat,
 } from "../src/index.ts";
 import * as upstreamDefinitions from "../src/cards/index.ts";
 import * as localDefinitions from "../src/cards/local/index.ts";
@@ -21,7 +22,7 @@ const upstreamIds = new Set(
 );
 
 describe("OP Practice local cards", () => {
-  test("the twelve EB05 local cards are registered while upstream lacks them", () => {
+  test("the 24 EB05 and OP18 local cards are registered while upstream lacks them", () => {
     expect(localCards.map((card) => card.id).sort()).toEqual([
       "EB05-001",
       "EB05-010",
@@ -35,6 +36,18 @@ describe("OP Practice local cards", () => {
       "EB05-055",
       "EB05-056",
       "EB05-057",
+      "OP18-060",
+      "OP18-064",
+      "OP18-065",
+      "OP18-083",
+      "OP18-084",
+      "OP18-085",
+      "OP18-088",
+      "OP18-093",
+      "OP18-095",
+      "OP18-096",
+      "OP18-097",
+      "OP18-119",
     ]);
     for (const card of localCards) {
       expect(upstreamIds.has(card.id)).toBe(false);
@@ -43,6 +56,7 @@ describe("OP Practice local cards", () => {
     }
     expect(localCardIdsDefinedUpstream).toEqual([]);
     expect(allCards.filter((card) => card.setId === "EB05")).toHaveLength(12);
+    expect(allCards.filter((card) => card.setId === "OP18")).toHaveLength(12);
   });
 
   test("a local card whose id upstream already defines is skipped (upstream wins)", () => {
@@ -57,5 +71,17 @@ describe("OP Practice local cards", () => {
     expect(cards.get("OP13-001")).toBe(upstream);
     expect(cards.get(eb05!.id)).toBe(eb05);
     expect(cards.size).toBe(2);
+  });
+
+  test("OP18-093 Sleeptids may be in a deck any number of times, like upstream's unlimited-copy cards", () => {
+    const copyLimit = (sleeptids: number, killingham: number) =>
+      validateDeckForFormat("standard", [
+        { cardId: "OP18-060", quantity: 1 },
+        { cardId: "OP18-093", quantity: sleeptids },
+        { cardId: "OP18-083", quantity: killingham },
+      ]).rules.find((rule) => rule.kind === "copy-limit")?.passed;
+    expect(getCard("OP18-093").effects?.deckBuildingRules).toEqual([{ rule: "unlimitedCopies" }]);
+    expect(copyLimit(46, 4)).toBe(true);
+    expect(copyLimit(45, 5)).toBe(false);
   });
 });
