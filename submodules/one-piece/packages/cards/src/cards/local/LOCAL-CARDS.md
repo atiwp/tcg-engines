@@ -49,18 +49,28 @@ Card definitions the pinned engine lacks, added for the OP Practice app in the f
 
 ## EB05 (rest)
 
-| Card     | Name                     | Supported                                                                                                                          | Not supported |
-| -------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| EB05-002 | Doll                     | All: [On Play] top 5, up to 2 cost 2+ {Navy} cards to hand, then trash 1                                                           | —             |
-| EB05-003 | Pasia                    | No text from source — vanilla                                                                                                      | —             |
-| EB05-004 | Baby 5                   | All: [On Play] reveal 2 Events: draw 2; [On K.O.] play a ≤6000-power Character from hand rested                                    | —             |
-| EB05-005 | Belo Betty               | All: [On Play] up to 3 {Revolutionary Army} Characters with a [Trigger] +2000; [Activate: Main] trash this: -2000                  | —             |
-| EB05-006 | Miss Buckingham Stussy   | All: [Activate: Main] [Once Per Turn] Life to hand: choose +3000 or -4000 on any Character                                         | —             |
-| EB05-007 | Monet                    | All: [On Play] reveal 3 Event/{Punk Hazard}: draw 1; [End of Your Turn] +5000 until the opponent's next End Phase                  | —             |
-| EB05-008 | Luffy, Now's Your Chance | All: [Main] give 1 active DON!! to the Leader + reveal 2 red Events: rested Character -7000; [Counter] no cost 5+ Character: +4000 | —             |
-| EB05-009 | Fight and Die with Me!!! | All: [Main] ≤4000 base power Characters +1000 until the opponent's next End Phase; [Counter] Leader +3000                          | —             |
-| EB05-011 | Otohime                  | All: [On Play] [Shirahoshi] Leader: turn a Life face-down: rest a cost ≤5 Character                                                | —             |
-| EB05-013 | Shirley                  | All: [On Your Opponent's Attack] [Once Per Turn] rest 1 DON!!: {Fish-Man}/{Merfolk} Leader +2000                                   | —             |
+| Card     | Name                                                                         | Supported                                                                                                                                      | Not supported |
+| -------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| EB05-002 | Doll                                                                         | All: [On Play] top 5, up to 2 cost 2+ {Navy} cards to hand, then trash 1                                                                       | —             |
+| EB05-003 | Pasia                                                                        | No text from source — vanilla                                                                                                                  | —             |
+| EB05-004 | Baby 5                                                                       | All: [On Play] reveal 2 Events: draw 2; [On K.O.] play a ≤6000-power Character from hand rested                                                | —             |
+| EB05-005 | Belo Betty                                                                   | All: [On Play] up to 3 {Revolutionary Army} Characters with a [Trigger] +2000; [Activate: Main] trash this: -2000                              | —             |
+| EB05-006 | Miss Buckingham Stussy                                                       | All: [Activate: Main] [Once Per Turn] Life to hand: choose +3000 or -4000 on any Character                                                     | —             |
+| EB05-007 | Monet                                                                        | All: [On Play] reveal 3 Event/{Punk Hazard}: draw 1; [End of Your Turn] +5000 until the opponent's next End Phase                              | —             |
+| EB05-008 | Luffy, Now's Your Chance                                                     | All: [Main] give 1 active DON!! to the Leader + reveal 2 red Events: rested Character -7000; [Counter] no cost 5+ Character: +4000             | —             |
+| EB05-009 | Fight and Die with Me!!!                                                     | All: [Main] ≤4000 base power Characters +1000 until the opponent's next End Phase; [Counter] Leader +3000                                      | —             |
+| EB05-011 | Otohime                                                                      | All: [On Play] [Shirahoshi] Leader: turn a Life face-down: rest a cost ≤5 Character                                                            | —             |
+| EB05-013 | Shirley                                                                      | All: [On Your Opponent's Attack] [Once Per Turn] rest 1 DON!!: {Fish-Man}/{Merfolk} Leader +2000                                               | —             |
+| EB05-014 | Shirahoshi                                                                   | All: [On Play] top 5, up to 2 [Megalo]/{Neptunian} to hand, trash the rest; [Activate: Main] rest this: a ≤6000-power {Neptunian} gains [Rush] | —             |
+| EB05-015 | Tashigi                                                                      | No text from source — vanilla                                                                                                                  | —             |
+| EB05-017 | Mermaid Cafe Dancers                                                         | All: [On Your Opponent's Attack] rest 1 DON!! and trash this: {Fish-Man}/{Merfolk} Leader +4000                                                | —             |
+| EB05-018 | Rebecca                                                                      | All: [On Play] a rested cost ≤6 Character stays rested next Refresh Phase                                                                      | —             |
+| EB05-019 | I Choose to Open This Country to the World!! I Want to Fight on Your Side!!! | All: [Counter] rest 1 card: {Land of Wano} +4000; [Trigger] opponent ≤3 Life: play a ≤6000-power {Land of Wano} Character                      | —             |
+| EB05-020 | My name is Shirahoshi!!                                                      | All: [Main] rest your [Shirahoshi] Leader: draw 2                                                                                              | —             |
+| EB05-022 | Octopako                                                                     | All: [On K.O.] draw 2                                                                                                                          | —             |
+| EB05-023 | Osome                                                                        | All: [On Play] trash 2 Events: draw 3                                                                                                          | —             |
+| EB05-024 | Little Sadi                                                                  | All: {Impel Down} Leader: [Blocker] and +2 cost                                                                                                | —             |
+| EB05-025 | Domino                                                                       | All: [On Play] top 3, an {Impel Down} card to hand; [Trigger] activate [On Play]                                                               | —             |
 
 ## OP18
 
