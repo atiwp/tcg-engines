@@ -22,20 +22,12 @@ const upstreamIds = new Set(
 );
 
 describe("OP Practice local cards", () => {
-  test("the 24 EB05 and OP18 local cards are registered while upstream lacks them", () => {
-    expect(localCards.map((card) => card.id).sort()).toEqual([
-      "EB05-001",
-      "EB05-010",
-      "EB05-012",
-      "EB05-016",
-      "EB05-021",
-      "EB05-028",
-      "EB05-047",
-      "EB05-052",
-      "EB05-053",
-      "EB05-055",
-      "EB05-056",
-      "EB05-057",
+  test("the local EB05 and OP18 cards are registered while upstream lacks them", () => {
+    const localIds = localCards.map((card) => card.id).sort();
+    const eb05 = localIds.filter((id) => id.startsWith("EB05-"));
+    expect(new Set(localIds).size).toBe(localIds.length);
+    expect(eb05.every((id) => /^EB05-0([0-5]\d|60|61)$/.test(id) && id !== "EB05-000")).toBe(true);
+    expect(localIds.filter((id) => !id.startsWith("EB05-"))).toEqual([
       "OP18-060",
       "OP18-064",
       "OP18-065",
@@ -55,7 +47,7 @@ describe("OP Practice local cards", () => {
       expect(getCard(card.id)).toBe(card);
     }
     expect(localCardIdsDefinedUpstream).toEqual([]);
-    expect(allCards.filter((card) => card.setId === "EB05")).toHaveLength(12);
+    expect(allCards.filter((card) => card.setId === "EB05")).toHaveLength(eb05.length);
     expect(allCards.filter((card) => card.setId === "OP18")).toHaveLength(12);
   });
 

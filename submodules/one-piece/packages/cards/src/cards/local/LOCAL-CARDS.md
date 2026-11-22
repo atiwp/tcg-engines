@@ -9,6 +9,11 @@ Card definitions the pinned engine lacks, added for the OP Practice app in the f
   Types are optcgapi's space-joined `sub_types`, split on the engine's existing type names.
   `imageUrl` follows optcgapi's `Card_Images/<id>.jpg` pattern and is unverified (OP Practice
   never loads it).
+- **EB05 (rest) source:** the remaining 49 EB05 cards from optcgapi.com, saved 2026-11-22
+  (`.work/local-cards-eb05-rest.json` in OP Practice), same rules as above. Six cards have no text in
+  the source (EB05-003, -015, -026, -032, -041, -058); their stat lines fit vanilla Characters, so
+  they are defined as vanilla (no `effect`, no `effects`). EB05-038's type "Senor Pink's Wife" matches
+  no existing type name and is kept whole.
 - **OP18 source:** card text typed by the user from oplaytcg.com/en/sets/OP18 on 2026-11-21
   (`.work/local-cards-op18.md` in OP Practice), image-checked by the OP Practice lead for all but
   OP18-083 (text only). Text is copied as typed. The Leader's rarity (L) is not in the data; every
@@ -22,7 +27,7 @@ Card definitions the pinned engine lacks, added for the OP Practice app in the f
   (`addLocalCards`); `localCardIdsDefinedUpstream` lists local ids upstream now defines. Delete
   those files when updating the engine.
 - **Tests:** `packages/cards/tests/local-cards.test.ts` (registration, upstream wins) and
-  `packages/engine/src/cards/local/{eb05,op18}-local-cards.test.ts` (each card played through the
+  `packages/engine/src/cards/local/{eb05,eb05-rest,op18}-local-cards.test.ts` (each card played through the
   engine).
 
 ## EB05
@@ -41,6 +46,21 @@ Card definitions the pinned engine lacks, added for the OP Practice app in the f
 | EB05-055 | Nami                | All: [Your Turn] [On Play] Wisdom-Leader deck-to-Life; [Trigger] trash 1: with ≤2 Life play this card                                                                                            | —                                                                                                                                   |
 | EB05-056 | Nico Olvia          | All: [On Play] trash a [Trigger] card: with a [Nico Robin] Leader draw 2; [Trigger] play this card                                                                                               | —                                                                                                                                   |
 | EB05-057 | Nojiko              | All: [Activate: Main] [Once Per Turn] give 1 rested DON!! to a "Special"/"Wisdom" Leader or Character; [Trigger] with ≤2 Life play a ≤6000-power [Trigger] Character from hand                   | —                                                                                                                                   |
+
+## EB05 (rest)
+
+| Card     | Name                     | Supported                                                                                                                          | Not supported |
+| -------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| EB05-002 | Doll                     | All: [On Play] top 5, up to 2 cost 2+ {Navy} cards to hand, then trash 1                                                           | —             |
+| EB05-003 | Pasia                    | No text from source — vanilla                                                                                                      | —             |
+| EB05-004 | Baby 5                   | All: [On Play] reveal 2 Events: draw 2; [On K.O.] play a ≤6000-power Character from hand rested                                    | —             |
+| EB05-005 | Belo Betty               | All: [On Play] up to 3 {Revolutionary Army} Characters with a [Trigger] +2000; [Activate: Main] trash this: -2000                  | —             |
+| EB05-006 | Miss Buckingham Stussy   | All: [Activate: Main] [Once Per Turn] Life to hand: choose +3000 or -4000 on any Character                                         | —             |
+| EB05-007 | Monet                    | All: [On Play] reveal 3 Event/{Punk Hazard}: draw 1; [End of Your Turn] +5000 until the opponent's next End Phase                  | —             |
+| EB05-008 | Luffy, Now's Your Chance | All: [Main] give 1 active DON!! to the Leader + reveal 2 red Events: rested Character -7000; [Counter] no cost 5+ Character: +4000 | —             |
+| EB05-009 | Fight and Die with Me!!! | All: [Main] ≤4000 base power Characters +1000 until the opponent's next End Phase; [Counter] Leader +3000                          | —             |
+| EB05-011 | Otohime                  | All: [On Play] [Shirahoshi] Leader: turn a Life face-down: rest a cost ≤5 Character                                                | —             |
+| EB05-013 | Shirley                  | All: [On Your Opponent's Attack] [Once Per Turn] rest 1 DON!!: {Fish-Man}/{Merfolk} Leader +2000                                   | —             |
 
 ## OP18
 

@@ -1,17 +1,27 @@
 // OP Practice local cards (fork-only): EB05 and OP18 definitions the pinned engine lacks.
 // Registered by src/index.ts only when upstream does not define the same id. See LOCAL-CARDS.md.
 export { localEb05Alvida021 } from "./characters/eb05-021-alvida.ts";
+export { localEb05Baby5004 } from "./characters/eb05-004-baby-5.ts";
+export { localEb05BeloBetty005 } from "./characters/eb05-005-belo-betty.ts";
 export { localEb05BoaHancock028 } from "./characters/eb05-028-boa-hancock.ts";
 export { localEb05Camie012 } from "./characters/eb05-012-camie.ts";
 export { localEb05CharlottePraline053 } from "./characters/eb05-053-charlotte-praline.ts";
+export { localEb05Doll002 } from "./characters/eb05-002-doll.ts";
+export { localEb05FightAndDieWithMe009 } from "./events/eb05-009-fight-and-die-with-me.ts";
 export { localEb05Gloriosa052 } from "./characters/eb05-052-gloriosa.ts";
 export { localEb05JewelryBonney001 } from "./characters/eb05-001-jewelry-bonney.ts";
+export { localEb05LuffyNowSYourChance008 } from "./events/eb05-008-luffy-now-s-your-chance.ts";
+export { localEb05MissBuckinghamStussy006 } from "./characters/eb05-006-miss-buckingham-stussy.ts";
+export { localEb05Monet007 } from "./characters/eb05-007-monet.ts";
 export { localEb05Nami055 } from "./characters/eb05-055-nami.ts";
 export { localEb05NicoOlvia056 } from "./characters/eb05-056-nico-olvia.ts";
 export { localEb05NicoRobin010 } from "./leaders/eb05-010-nico-robin.ts";
 export { localEb05NicoRobin016 } from "./characters/eb05-016-nico-robin.ts";
 export { localEb05Nojiko057 } from "./characters/eb05-057-nojiko.ts";
+export { localEb05Otohime011 } from "./characters/eb05-011-otohime.ts";
+export { localEb05Pasia003 } from "./characters/eb05-003-pasia.ts";
 export { localEb05Ripley047 } from "./characters/eb05-047-ripley.ts";
+export { localEb05Shirley013 } from "./characters/eb05-013-shirley.ts";
 export { localOp18AbyssPentagram097 } from "./stages/op18-097-abyss-pentagram.ts";
 export { localOp18Cerberus085 } from "./characters/op18-085-cerberus.ts";
 export { localOp18ILlMakeTheCall096 } from "./events/op18-096-i-ll-make-the-call.ts";
