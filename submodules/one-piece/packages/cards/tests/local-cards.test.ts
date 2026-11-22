@@ -26,7 +26,10 @@ describe("OP Practice local cards", () => {
     const localIds = localCards.map((card) => card.id).sort();
     const eb05 = localIds.filter((id) => id.startsWith("EB05-"));
     expect(new Set(localIds).size).toBe(localIds.length);
-    expect(eb05.every((id) => /^EB05-0([0-5]\d|60|61)$/.test(id) && id !== "EB05-000")).toBe(true);
+    // Every EB05 card, EB05-001 to EB05-061.
+    expect(eb05).toEqual(
+      Array.from({ length: 61 }, (_, i) => `EB05-${String(i + 1).padStart(3, "0")}`),
+    );
     expect(localIds.filter((id) => !id.startsWith("EB05-"))).toEqual([
       "OP18-060",
       "OP18-064",

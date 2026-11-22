@@ -1,16 +1,22 @@
 // OP Practice local cards (fork-only): EB05 and OP18 definitions the pinned engine lacks.
 // Registered by src/index.ts only when upstream does not define the same id. See LOCAL-CARDS.md.
+export { localEb05Ahiru051 } from "./characters/eb05-051-ahiru.ts";
 export { localEb05Alvida021 } from "./characters/eb05-021-alvida.ts";
+export { localEb05Atlas050 } from "./characters/eb05-050-atlas.ts";
 export { localEb05Baby5004 } from "./characters/eb05-004-baby-5.ts";
+export { localEb05BellMere058 } from "./characters/eb05-058-bell-mere.ts";
 export { localEb05BeloBetty005 } from "./characters/eb05-005-belo-betty.ts";
 export { localEb05BlackMaria037 } from "./characters/eb05-037-black-maria.ts";
 export { localEb05BoaHancock028 } from "./characters/eb05-028-boa-hancock.ts";
 export { localEb05Camie012 } from "./characters/eb05-012-camie.ts";
+export { localEb05CharlotteBrulee054 } from "./characters/eb05-054-charlotte-brulee.ts";
 export { localEb05CharlottePraline053 } from "./characters/eb05-053-charlotte-praline.ts";
+export { localEb05CharlottePudding059 } from "./events/eb05-059-charlotte-pudding.ts";
 export { localEb05Doll002 } from "./characters/eb05-002-doll.ts";
 export { localEb05Domino025 } from "./characters/eb05-025-domino.ts";
 export { localEb05FightAndDieWithMe009 } from "./events/eb05-009-fight-and-die-with-me.ts";
 export { localEb05Gloriosa052 } from "./characters/eb05-052-gloriosa.ts";
+export { localEb05HedgehogStinger048 } from "./events/eb05-048-hedgehog-stinger.ts";
 export { localEb05Hibari027 } from "./characters/eb05-027-hibari.ts";
 export { localEb05Hina026 } from "./characters/eb05-026-hina.ts";
 export { localEb05IChooseToOpenThisCountry019 } from "./events/eb05-019-i-choose-to-open-this-country.ts";
@@ -26,6 +32,7 @@ export { localEb05MsFatherSDay044 } from "./characters/eb05-044-ms-father-s-day.
 export { localEb05MsMonday045 } from "./characters/eb05-045-ms-monday.ts";
 export { localEb05MyNameIsShirahoshi020 } from "./events/eb05-020-my-name-is-shirahoshi.ts";
 export { localEb05Nami055 } from "./characters/eb05-055-nami.ts";
+export { localEb05Nami061 } from "./characters/eb05-061-nami.ts";
 export { localEb05NicoOlvia056 } from "./characters/eb05-056-nico-olvia.ts";
 export { localEb05NicoRobin010 } from "./leaders/eb05-010-nico-robin.ts";
 export { localEb05NicoRobin016 } from "./characters/eb05-016-nico-robin.ts";
@@ -43,9 +50,11 @@ export { localEb05Russian038 } from "./characters/eb05-038-russian.ts";
 export { localEb05Shinobu042 } from "./characters/eb05-042-shinobu.ts";
 export { localEb05Shirahoshi014 } from "./characters/eb05-014-shirahoshi.ts";
 export { localEb05Shirley013 } from "./characters/eb05-013-shirley.ts";
+export { localEb05SpecialHollow049 } from "./events/eb05-049-special-hollow.ts";
 export { localEb05Speed035 } from "./characters/eb05-035-speed.ts";
 export { localEb05Sugar034 } from "./characters/eb05-034-sugar.ts";
 export { localEb05TakeCareEverybody030 } from "./events/eb05-030-take-care-everybody.ts";
+export { localEb05TakeCareOfLilith060 } from "./events/eb05-060-take-care-of-lilith.ts";
 export { localEb05Tashigi015 } from "./characters/eb05-015-tashigi.ts";
 export { localEb05Tsuru036 } from "./characters/eb05-036-tsuru.ts";
 export { localEb05Ulti032 } from "./characters/eb05-032-ulti.ts";

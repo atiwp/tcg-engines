@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import * as opCards from "@tcg/op-cards";
 import { allCards, getCard } from "@tcg/op-cards";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -16,6 +17,15 @@ const vanillaCharacterIds = inventory
   .map((line) => /^\|\s*([^|]+?)\s*\|[^|]*\|\s*vanilla\s*\|/.exec(line)?.[1]?.trim())
   .filter((id): id is string => Boolean(id));
 
+// OP Practice local cards (fork-only): not in the upstream inventory document.
+const localCardIds = new Set(
+  Object.entries(opCards)
+    .filter(
+      ([name, value]) => name.startsWith("local") && typeof value === "object" && value !== null,
+    )
+    .map(([, value]) => (value as { id: string }).id),
+);
+
 function isBlankAbilityText(text: string | undefined) {
   return text === undefined || text.trim() === "" || /^(?:NULL|-)$/i.test(text.trim());
 }
@@ -31,7 +41,8 @@ describe("canonical vanilla Character catalog", () => {
           isBlankAbilityText(card.effect) &&
           isBlankAbilityText(card.trigger) &&
           isBlankAbilityText(card.i18n.en.effect) &&
-          card.effects === undefined,
+          card.effects === undefined &&
+          !localCardIds.has(card.id),
       )
       .map((card) => card.id);
     expect([...vanillaCharacterIds].sort()).toEqual(catalogVanillas.sort());

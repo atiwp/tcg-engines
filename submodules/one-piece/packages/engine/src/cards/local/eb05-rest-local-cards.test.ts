@@ -1180,3 +1180,353 @@ describe("EB05-046 Yamato", () => {
     expect(ids(south(e).hand)).toEqual(["EB01-005"]);
   });
 });
+
+describe("EB05-048 Hedgehog Stinger", () => {
+  test("Main: rest 1 DON!! and K.O. a Baroque Works Character: cost 0 Characters cannot [Blocker]", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["EB05-049", "EB05-048"],
+        character: ["OP02-054", "OP02-053", { card: { id: "EB01-018" }, playedOnTurn: 0 }],
+        activeDon: 3,
+      },
+      { character: ["OP02-081"] },
+    );
+    // Special Hollow makes the cost 2 [Blocker] OP02-081 cost 0 first.
+    e.playCard("EB05-049", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["OP02-081"], "south");
+    e.playCard("EB05-048", "south");
+    e.accept("south");
+    expect(ids(south(e).trash)).toContain("OP02-053");
+    expect(south(e).restedDon).toBe(3);
+    e.declareAttack(e.findCardInZone("south", "character", "EB01-018"), e.leader("north"), "south");
+    expect(
+      e
+        .getState()
+        .promptQueue.some(
+          (p) => p.status === "pending" && p.resolutionContext?.intent === "battleBlocker",
+        ),
+    ).toBe(false);
+  });
+
+  test("declining keeps the Baroque Works Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-048"], character: ["OP02-053"], activeDon: 2 },
+      {},
+    );
+    e.playCard("EB05-048", "south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP02-053");
+    expect(south(e).activeDon).toBe(1);
+  });
+
+  test("Counter: the Leader gains +3000 this battle", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-048"], activeDon: 1 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-048");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    expect(south(e).lifeCount).toBe(life);
+  });
+});
+
+describe("EB05-049 Special Hollow", () => {
+  test("Main: K.O. a {Thriller Bark Pirates} Character: an opposing Character gets -3 cost", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-049"], character: ["OP02-054"], activeDon: 1 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-049", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.cost).toBe(2);
+    expect(ids(south(e).trash)).toContain("OP02-054");
+  });
+
+  test("declining keeps the Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-049"], character: ["OP02-054"], activeDon: 1 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-049", "south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP02-054");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.cost).toBe(5);
+  });
+
+  test("Counter: K.O. a {Thriller Bark Pirates} Character: +4000 this battle", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-049"], character: ["OP02-054"], activeDon: 1 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-049");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    e.accept("south");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+    expect(south(e).lifeCount).toBe(life);
+    expect(ids(south(e).trash)).toContain("OP02-054");
+  });
+});
+
+describe("EB05-050 Atlas", () => {
+  const deck = ["EB02-029", "EB01-005", "OP01-012", "EB01-018", "EB01-005"];
+  test("On Play adds a Wisdom attribute card from the top 4", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-050"], deck, activeDon: 1 }, {});
+    e.playCard("EB05-050", "south");
+    expect(() => e.choose("effectSearchSelection", ["OP01-012"], "south")).toThrow();
+    e.choose("effectSearchSelection", ["EB02-029"], "south");
+    keepRemainderOrder(e);
+    expect(ids(south(e).hand)).toEqual(["EB02-029"]);
+  });
+
+  test("Trigger activates the On Play effect", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["EB05-050", "EB01-005"], deck },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    e.choose("effectSearchSelection", ["EB02-029"], "south");
+    keepRemainderOrder(e);
+    expect(ids(south(e).hand)).toEqual(["EB02-029"]);
+  });
+});
+
+describe("EB05-051 Ahiru", () => {
+  test("On Play rests a Character with cost ≤ both players' total Life", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-051"], life: 2, activeDon: 3 },
+      { life: 3, character: ["EB01-018", "EB01-055"] },
+    );
+    e.playCard("EB05-051", "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-018"]);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+  });
+
+  test("Trigger plays this card", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["EB05-051", "EB01-005"] },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    expect(ids(south(e).characters)).toContain("EB05-051");
+  });
+});
+
+describe("EB05-054 Charlotte Brulee", () => {
+  test("Trigger plays up to 2 {Big Mom Pirates} Characters with 4000 power from hand", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["EB05-054", "EB01-005"], hand: ["OP03-103", "ST07-006", "OP01-012"] },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [] }, "south");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    expect(candidates(e, "effectPlaySelection").sort(byText)).toEqual(["OP03-103", "ST07-006"]);
+    e.choose("effectPlaySelection", ["OP03-103", "ST07-006"], "south");
+    expect(ids(south(e).characters)).toEqual(expect.arrayContaining(["OP03-103", "ST07-006"]));
+  });
+});
+
+describe("EB05-058 Bell-mere (no text from source: vanilla)", () => {
+  test("plays as a 4-cost 6000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-058"], activeDon: 4 }, {});
+    e.playCard("EB05-058", "south");
+    expect(powerOf(e, "south", "EB05-058")).toBe(6000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-059 Charlotte Pudding!!", () => {
+  test("Main draws 1; 4000 base power {Big Mom Pirates} Characters cannot be K.O.'d in battle", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["EB05-059"],
+        character: [
+          { card: { id: "OP03-103" }, rested: true },
+          { card: { id: "OP01-012" }, rested: true },
+        ],
+        deck: 3,
+        activeDon: 1,
+      },
+      {
+        character: [
+          { card: { id: "EB01-041" }, playedOnTurn: 0 },
+          { card: { id: "EB01-055" }, playedOnTurn: 0 },
+        ],
+      },
+    );
+    e.playCard("EB05-059", "south");
+    expect(south(e).hand).toHaveLength(1);
+    e.endTurn("south");
+    e.declareAttack(
+      e.findCardInZone("north", "character", "EB01-041"),
+      e.findCardInZone("south", "character", "OP03-103"),
+      "north",
+    );
+    if (e.hasPendingChoice("south"))
+      e.resolveDecision("battleCounter", { selectedIds: [] }, "south");
+    expect(ids(south(e).characters)).toContain("OP03-103");
+    e.declareAttack(
+      e.findCardInZone("north", "character", "EB01-055"),
+      e.findCardInZone("south", "character", "OP01-012"),
+      "north",
+    );
+    if (e.hasPendingChoice("south"))
+      e.resolveDecision("battleCounter", { selectedIds: [] }, "south");
+    expect(ids(south(e).trash)).toContain("OP01-012");
+  });
+
+  test("Trigger draws 1 and plays a 4000-power Character with a [Trigger] from hand", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["EB05-059", "EB01-005"], hand: ["OP03-033", "OP03-103"], deck: 3 },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [] }, "south");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    expect(candidates(e, "effectPlaySelection")).toEqual(["OP03-033"]);
+    e.choose("effectPlaySelection", ["OP03-033"], "south");
+    expect(ids(south(e).characters)).toContain("OP03-033");
+    expect(south(e).deckCount).toBe(2);
+  });
+});
+
+describe("EB05-060 Take Care of Lilith!!!", () => {
+  test("Main: trash a cost 5+ {Egghead} Character to add the top deck card to Life", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-060"], character: ["OP13-101"], deck: 3, activeDon: 1 },
+      {},
+    );
+    const life = south(e).lifeCount;
+    e.playCard("EB05-060", "south");
+    e.accept("south");
+    if (e.hasPendingChoice("south")) {
+      e.resolveDecision("effectAddToLifeFromDeck", { optionId: "1" }, "south");
+    }
+    expect(south(e).lifeCount).toBe(life + 1);
+    expect(ids(south(e).trash)).toContain("OP13-101");
+  });
+
+  test("declining keeps the Character and the Life", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-060"], character: ["OP13-101"], deck: 3, activeDon: 1 },
+      {},
+    );
+    const life = south(e).lifeCount;
+    e.playCard("EB05-060", "south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP13-101");
+    expect(south(e).lifeCount).toBe(life);
+  });
+
+  test("Counter: turn a Life face-up: +4000 this battle", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-060"], activeDon: 1 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-060");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    e.accept("south");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+    expect(south(e).lifeCount).toBe(life);
+    expect(e.getState().cards[e.getState().players.south.life[0]!]?.faceUp).toBe(true);
+  });
+});
+
+describe("EB05-061 Nami", () => {
+  test("On Play plays a red cost 2 or less Character from hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-061", "EB01-005", "EB01-018"], activeDon: 3 },
+      {},
+    );
+    e.playCard("EB05-061", "south");
+    expect(candidates(e, "effectPlaySelection")).toEqual(["EB01-005"]);
+    e.choose("effectPlaySelection", ["EB01-005"], "south");
+    expect(ids(south(e).characters)).toContain("EB01-005");
+  });
+
+  test("once per turn, a K.O. in battle is replaced by adding the top Life card to hand", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        character: [
+          "EB05-061",
+          { card: { id: "EB01-005" }, rested: true },
+          { card: { id: "OP01-012" }, rested: true },
+        ],
+      },
+      {
+        character: [
+          { card: { id: "EB01-041" }, playedOnTurn: 0 },
+          { card: { id: "EB01-018" }, playedOnTurn: 0 },
+        ],
+      },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    e.declareAttack(
+      e.findCardInZone("north", "character", "EB01-041"),
+      e.findCardInZone("south", "character", "EB01-005"),
+      "north",
+    );
+    e.resolveDecision("battleKoReplacement", { optionId: "yes" }, "south");
+    expect(ids(south(e).characters)).toContain("EB01-005");
+    expect(south(e).lifeCount).toBe(life - 1);
+    expect(south(e).hand).toHaveLength(1);
+    e.declareAttack(
+      e.findCardInZone("north", "character", "EB01-018"),
+      e.findCardInZone("south", "character", "OP01-012"),
+      "north",
+    );
+    if (e.hasPendingChoice("south"))
+      e.resolveDecision("battleCounter", { selectedIds: [] }, "south");
+    expect(ids(south(e).trash)).toEqual(["OP01-012"]);
+  });
+
+  test("an opponent's effect K.O. is replaced too; declining lets it happen", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: ["EB05-061", "EB05-012"] },
+        { hand: ["OP13-013"], activeDon: 3 },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    const life = south(e).lifeCount;
+    e.playCard("OP13-013", "north");
+    e.choose(
+      "effectTargetSelection",
+      [e.findCardInZone("south", "character", "EB05-012")],
+      "north",
+    );
+    e.resolveDecision("effectKoReplacement", { optionId: "yes" }, "south");
+    expect(ids(south(e).characters)).toContain("EB05-012");
+    expect(south(e).lifeCount).toBe(life - 1);
+
+    const d = make();
+    d.playCard("OP13-013", "north");
+    d.choose(
+      "effectTargetSelection",
+      [d.findCardInZone("south", "character", "EB05-012")],
+      "north",
+    );
+    d.resolveDecision("effectKoReplacement", { optionId: "no" }, "south");
+    expect(ids(south(d).trash)).toEqual(["EB05-012"]);
+    expect(south(d).lifeCount).toBe(life);
+  });
+});
