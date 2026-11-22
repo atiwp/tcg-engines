@@ -2215,6 +2215,11 @@ export function resolveEffectAfterCosts(
       return;
     }
     if (!postCostCondition.matches) {
+      // OP Practice fork fix (user-approved 2026-11-22): the cost is paid, so a [Once Per Turn]
+      // ability has been activated and is used even when its post-cost "If" fails.
+      if (block.oncePerTurn && !source.usedEffectKeys.includes(effectKey)) {
+        source.usedEffectKeys.push(effectKey);
+      }
       return;
     }
   }
