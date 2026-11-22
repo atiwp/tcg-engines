@@ -908,3 +908,275 @@ describe("EB05-036 Tsuru", () => {
     expect(south(e).restedDon).toBe(4);
   });
 });
+
+describe("EB05-037 Black Maria", () => {
+  test("On Play adds an {Animal Kingdom Pirates} card from the top 3", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-037"], deck: ["EB01-025", "EB01-005", "OP01-012", "EB01-018"], activeDon: 1 },
+      {},
+    );
+    e.playCard("EB05-037", "south");
+    expect(() => e.choose("effectSearchSelection", ["EB01-005"], "south")).toThrow();
+    e.choose("effectSearchSelection", ["EB01-025"], "south");
+    keepRemainderOrder(e);
+    expect(ids(south(e).hand)).toEqual(["EB01-025"]);
+    expect(south(e).deckCount).toBe(3);
+  });
+});
+
+describe("EB05-038 Russian", () => {
+  test("On Play: a [Senor Pink] gains +3000 this turn", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-038"], character: ["OP04-026", "EB01-005"], activeDon: 1 },
+      {},
+    );
+    e.playCard("EB05-038", "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["OP04-026"]);
+    e.choose("effectTargetSelection", ["OP04-026"], "south");
+    expect(powerOf(e, "south", "OP04-026")).toBe(8000);
+    expect(powerOf(e, "south", "EB01-005")).toBe(3000);
+  });
+});
+
+describe("EB05-039 Pink Hornet", () => {
+  test("Main DON!! -1 with a {The Vinsmoke Family} Leader: an opposing Character gets -4000", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP12-041", hand: ["EB05-039"], activeDon: 3 },
+      { character: ["EB01-018"] },
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("EB05-039", "south");
+    e.accept("south");
+    payReturnDon(e, 1);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(powerOf(e, "north", "EB01-018")).toBe(3000);
+    expect(south(e).donDeckCount).toBe(donDeck + 1);
+  });
+
+  test("declining the Main changes nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP12-041", hand: ["EB05-039"], activeDon: 3 },
+      { character: ["EB01-018"] },
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("EB05-039", "south");
+    e.decline("south");
+    expect(powerOf(e, "north", "EB01-018")).toBe(7000);
+    expect(south(e).donDeckCount).toBe(donDeck);
+  });
+
+  test("Counter DON!! -1: the Leader gains +4000 this battle", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-039"], activeDon: 2 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-039");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    e.accept("south");
+    payReturnDon(e, 1);
+    expect(south(e).lifeCount).toBe(life);
+  });
+});
+
+describe("EB05-040 You Need Me, Don't You?!!", () => {
+  test("Main: return 1 active DON!! with a {Donquixote Pirates} Leader: draw 3, trash 1", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP05-022", hand: ["EB05-040"], deck: 5, activeDon: 2 },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("EB05-040", "south");
+    e.accept("south");
+    payReturnDon(e, 1);
+    const hand = e.getState().players.south.hand;
+    expect(hand).toHaveLength(3);
+    e.resolveDecision("effectTrashFromHandSelection", { selectedIds: [hand[0]!] }, "south");
+    expect(south(e).hand).toHaveLength(2);
+    expect(south(e).donDeckCount).toBe(donDeck + 1);
+  });
+
+  test("declining draws nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP05-022", hand: ["EB05-040"], deck: 5, activeDon: 2 },
+      {},
+    );
+    e.playCard("EB05-040", "south");
+    e.decline("south");
+    expect(south(e).deckCount).toBe(5);
+    expect(south(e).activeDon).toBe(2);
+  });
+
+  test("Counter: the Leader gains +2000 this battle", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-040"] },
+      { character: [{ card: { id: "EB01-005" }, playedOnTurn: 0 }], activeDon: 3 },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-040");
+    e.attachDon(e.findCardInZone("north", "character", "EB01-005"), 3, "north");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-005"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    expect(south(e).lifeCount).toBe(life);
+  });
+});
+
+describe("EB05-041 Koala (no text from source: vanilla)", () => {
+  test("plays as a 2-cost 4000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-041"], activeDon: 2 }, {});
+    e.playCard("EB05-041", "south");
+    expect(powerOf(e, "south", "EB05-041")).toBe(4000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-042 Shinobu", () => {
+  test("On Play draws 2 and trashes 2", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-042", "EB01-005"], deck: 4, activeDon: 4 },
+      {},
+    );
+    e.playCard("EB05-042", "south");
+    const hand = e.getState().players.south.hand;
+    expect(hand).toHaveLength(3);
+    e.resolveDecision("effectTrashFromHandSelection", { selectedIds: hand.slice(0, 2) }, "south");
+    expect(south(e).hand).toHaveLength(1);
+    expect(south(e).trash).toHaveLength(2);
+    expect(south(e).deckCount).toBe(2);
+  });
+});
+
+describe("EB05-043 Perona", () => {
+  test.each([
+    ["0", "trash"],
+    ["1", "rested"],
+  ] as const)(
+    "On K.O. option %s: K.O. or rest a cost 6 or less Character (%s)",
+    (optionId, result) => {
+      const e = OnePieceTestEngine.create(
+        { character: [{ card: { id: "EB05-043" }, rested: true }] },
+        { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }, "EB01-018"] },
+        { activeSeat: "north" },
+      );
+      northAttacksSouthCharacter(e, "EB05-043");
+      e.resolveDecision("effectActionChoice", { optionId }, "south");
+      e.choose("effectTargetSelection", ["EB01-018"], "south");
+      if (result === "trash") {
+        expect(ids(north(e).trash)).toEqual(["EB01-018"]);
+      } else {
+        expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+      }
+    },
+  );
+});
+
+describe("EB05-044 Ms. Father's Day", () => {
+  test("On Play with a Baroque Works Leader and an opposing cost 0 Character: opposing Leader -1000", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP14-079", hand: ["EB05-044"], character: ["OP02-053"], activeDon: 2 },
+      { character: ["EB01-005"] },
+    );
+    // The OP14-079 Leader K.O.s OP02-053 to give EB01-005 -10 cost (cost 0).
+    e.activateMain(e.leader("south"), "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-005"], "south");
+    e.resolveDecision("effectActionChoice", { optionId: "1" }, "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-005")?.cost).toBe(0);
+    e.playCard("EB05-044", "south");
+    expect(north(e).leader?.power).toBe(4000);
+  });
+
+  test("On Play does nothing when no opposing Character costs 0", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP14-079", hand: ["EB05-044"], activeDon: 2 },
+      { character: ["EB01-005"] },
+    );
+    e.playCard("EB05-044", "south");
+    expect(north(e).leader?.power).toBe(5000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-045 Ms. Monday", () => {
+  test("On Play K.O.s up to 1 of your Baroque Works Characters", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-045"], character: ["OP02-053", "EB01-005"], activeDon: 2 },
+      {},
+    );
+    e.playCard("EB05-045", "south");
+    expect(candidates(e, "effectTargetSelection").sort(byText)).toEqual(["EB05-045", "OP02-053"]);
+    e.choose("effectTargetSelection", ["OP02-053"], "south");
+    expect(ids(south(e).trash)).toEqual(["OP02-053"]);
+  });
+
+  test("On K.O. adds a Baroque Works card from the top 3 and trashes the rest", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        character: [{ card: { id: "EB05-045" }, rested: true }],
+        deck: ["OP09-055", "EB01-005", "OP01-012", "EB01-018"],
+      },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    northAttacksSouthCharacter(e, "EB05-045");
+    e.choose("effectSearchSelection", ["OP09-055"], "south");
+    expect(ids(south(e).hand)).toEqual(["OP09-055"]);
+    expect(south(e).trash).toHaveLength(3);
+    expect(south(e).deckCount).toBe(1);
+  });
+});
+
+describe("EB05-046 Yamato", () => {
+  test("against an 8000+ base power Character it gains [Blocker] and +3000", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["EB05-046"] },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    expect(powerOf(e, "south", "EB05-046")).toBe(8000);
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-041"), e.leader("south"), "north");
+    if (
+      e
+        .getState()
+        .promptQueue.some(
+          (p) => p.status === "pending" && p.resolutionContext?.intent === "effectOptional",
+        )
+    ) {
+      e.decline("south");
+    }
+    expect(candidates(e, "battleBlocker").filter(Boolean)).toEqual(["EB05-046"]);
+  });
+
+  test("without one it stays 5000 power", () => {
+    const e = OnePieceTestEngine.create({ character: ["EB05-046"] }, { character: ["EB01-018"] });
+    expect(powerOf(e, "south", "EB05-046")).toBe(5000);
+  });
+
+  test("On Your Opponent's Attack: trash 1 with 10+ trash: Leader base power becomes 7000", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["EB05-046"], hand: ["EB01-005"], trash: 10 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.accept("south");
+    expect(south(e).leader?.power).toBe(7000);
+    expect(south(e).lifeCount).toBe(life - 1);
+  });
+
+  test("declining keeps the hand and the Leader at 5000", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["EB05-046"], hand: ["EB01-005"], trash: 10 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.decline("south");
+    expect(south(e).leader?.power).toBe(5000);
+    expect(ids(south(e).hand)).toEqual(["EB01-005"]);
+  });
+});
