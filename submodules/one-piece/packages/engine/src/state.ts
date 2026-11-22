@@ -968,6 +968,12 @@ function resetStartOfTurnState(state: MatchState, seat: MatchSeat) {
   let returningDon = 0;
 
   for (const instance of Object.values(state.cards)) {
+    // OP Practice fork fix (user-approved 2026-11-22): [Once Per Turn] means once in every turn,
+    // so both players' field cards may use such abilities again when any turn starts.
+    if (instance.zone === "leader" || instance.zone === "character" || instance.zone === "stage") {
+      instance.usedEffectKeys = [];
+    }
+
     if (instance.controller !== seat) {
       continue;
     }
