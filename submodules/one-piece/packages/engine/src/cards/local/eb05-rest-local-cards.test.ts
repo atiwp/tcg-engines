@@ -29,6 +29,25 @@ const keepRemainderOrder = (e: Engine, seat: Seat = "south") => {
     seat,
   );
 };
+/** Pay a DON!! -N cost by returning the first offered DON!! cards, if the engine asks. */
+const payReturnDon = (e: Engine, n: number, seat: Seat = "south") => {
+  const pending = e
+    .getState()
+    .promptQueue.some(
+      (p) =>
+        p.status === "pending" &&
+        p.seat === seat &&
+        p.resolutionContext?.intent === "effectCostReturnDon",
+    );
+  if (!pending) return;
+  const step = e.pendingDecision("effectCostReturnDon", seat).steps[0];
+  if (step?.kind !== "payCost") throw new Error("Expected a DON!! return.");
+  e.resolveDecision(
+    "effectCostReturnDon",
+    { selectedIds: step.candidates.slice(0, n).map((c) => c.ref.id) },
+    seat,
+  );
+};
 const south = (e: Engine) => e.getView("south").players.south;
 const north = (e: Engine) => e.getView("south").players.north;
 const powerOf = (e: Engine, seat: Seat, cardId: string) =>
@@ -628,5 +647,264 @@ describe("EB05-025 Domino", () => {
     e.choose("effectSearchSelection", ["EB01-032"], "south");
     keepRemainderOrder(e);
     expect(ids(south(e).hand)).toEqual(["EB01-032"]);
+  });
+});
+
+describe("EB05-026 Hina (no text from source: vanilla)", () => {
+  test("plays as a 7-cost 8000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-026"], activeDon: 7 }, {});
+    e.playCard("EB05-026", "south");
+    expect(powerOf(e, "south", "EB05-026")).toBe(8000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-027 Hibari", () => {
+  test("On Play draws 3, trashes 2, then bottoms up to 1 cost 2 or less Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-027"], deck: 5, activeDon: 5 },
+      { character: ["EB01-005", "EB01-018"] },
+    );
+    e.playCard("EB05-027", "south");
+    const hand = e.getState().players.south.hand;
+    expect(hand).toHaveLength(3);
+    e.resolveDecision("effectTrashFromHandSelection", { selectedIds: hand.slice(0, 2) }, "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-005"]);
+    e.choose("effectTargetSelection", ["EB01-005"], "south");
+    expect(south(e).hand).toHaveLength(1);
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-018"]);
+    expect(north(e).deckCount).toBe(11);
+  });
+});
+
+describe("EB05-029 Kimono Sleeve Cage", () => {
+  test("Main: trash 1: return an opposing cost 6 or less Character to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-029", "EB01-005"], activeDon: 5 },
+      { character: ["EB01-018", "EB01-055"] },
+    );
+    e.playCard("EB05-029", "south");
+    e.accept("south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-018"]);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-055"]);
+    expect(north(e).handCount).toBe(1);
+    expect(ids(south(e).trash).sort(byText)).toEqual(["EB01-005", "EB05-029"]);
+  });
+
+  test("declining keeps the hand card and the opposing Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-029", "EB01-005"], activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-029", "south");
+    e.decline("south");
+    expect(ids(south(e).hand)).toEqual(["EB01-005"]);
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-018"]);
+  });
+});
+
+describe("EB05-030 Take Care, Everybody.", () => {
+  test("Main with a [Nami] Leader returns a cost 5 or less Character to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP03-040", hand: ["EB05-030"], activeDon: 2 },
+      { character: ["EB01-018", "EB01-055"] },
+    );
+    e.playCard("EB05-030", "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-018"]);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(north(e).handCount).toBe(1);
+  });
+
+  test("Main does nothing without a [Nami] Leader", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-030"], activeDon: 2 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-030", "south");
+    expect(north(e).handCount).toBe(0);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+
+  test("Counter draws 1 and gives +1000", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-030"], deck: 3, activeDon: 2 },
+      { character: [{ card: { id: "EB01-005" }, playedOnTurn: 0 }], activeDon: 3 },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    const eventId = e.findCardInZone("south", "hand", "EB05-030");
+    // A 5000-power attacker hits the 5000 Leader only without the +1000.
+    e.attachDon(e.findCardInZone("north", "character", "EB01-005"), 2, "north");
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-005"), e.leader("south"), "north");
+    e.resolveDecision("battleCounter", { selectedIds: [eventId] }, "south");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+    expect(south(e).deckCount).toBe(2);
+    expect(south(e).lifeCount).toBe(life);
+  });
+});
+
+describe("EB05-031 Vinsmoke Reiju", () => {
+  test("On Play DON!! -1 with a {The Vinsmoke Family} Leader trashes the top 10", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP06-042", hand: ["EB05-031"], deck: 12, activeDon: 6 },
+      {},
+    );
+    const deck = south(e).deckCount;
+    e.playCard("EB05-031", "south");
+    e.accept("south");
+    payReturnDon(e, 1);
+    // The OP06-042 Leader draws 1 when a DON!! is returned; Reiju then trashes 10.
+    expect(south(e).hand).toHaveLength(1);
+    expect(south(e).deckCount).toBe(deck - 11);
+    expect(south(e).trash).toHaveLength(10);
+  });
+
+  test("declining the DON!! -1 trashes nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP06-042", hand: ["EB05-031"], deck: 12, activeDon: 6 },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("EB05-031", "south");
+    e.decline("south");
+    expect(south(e).deckCount).toBe(12);
+    expect(south(e).donDeckCount).toBe(donDeck);
+  });
+
+  test("Activate: Main trash this: against an 8000+ base power Character add up to 4 active DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["EB05-031"], activeDon: 0 },
+      { character: ["EB01-041"] },
+    );
+    const donDeck = south(e).donDeckCount;
+    e.activateMain("EB05-031", "south");
+    e.accept("south");
+    if (e.hasPendingChoice("south")) e.resolveDecision("effectAddDon", { optionId: "4" }, "south");
+    expect(south(e).activeDon).toBe(4);
+    expect(south(e).donDeckCount).toBe(donDeck - 4);
+    expect(ids(south(e).trash)).toEqual(["EB05-031"]);
+  });
+});
+
+describe("EB05-032 Ulti (no text from source: vanilla)", () => {
+  test("plays as a 4-cost 6000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-032"], activeDon: 4 }, {});
+    e.playCard("EB05-032", "south");
+    expect(powerOf(e, "south", "EB05-032")).toBe(6000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-033 Nico Robin", () => {
+  test("On Play with a Straw Hat Leader and 6+ fewer DON!!: draw 3, trash 2, add 4 rested DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "EB02-010", hand: ["EB05-033"], deck: 5, activeDon: 1 },
+      { activeDon: 8 },
+    );
+    e.playCard("EB05-033", "south");
+    const hand = e.getState().players.south.hand;
+    expect(hand).toHaveLength(3);
+    e.resolveDecision("effectTrashFromHandSelection", { selectedIds: hand.slice(0, 2) }, "south");
+    if (e.hasPendingChoice("south")) e.resolveDecision("effectAddDon", { optionId: "4" }, "south");
+    expect(south(e).hand).toHaveLength(1);
+    expect(south(e).restedDon).toBe(5);
+  });
+
+  test("On Play does nothing when the DON!! gap is under 6", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "EB02-010", hand: ["EB05-033"], deck: 5, activeDon: 3 },
+      { activeDon: 8 },
+    );
+    e.playCard("EB05-033", "south");
+    expect(south(e).deckCount).toBe(5);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("EB05-034 Sugar", () => {
+  test("On Play DON!! -2 with 7+ DON!! left: an opposing Character gets -4000", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-034"], activeDon: 10 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-034", "south");
+    e.accept("south");
+    payReturnDon(e, 2);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(powerOf(e, "north", "EB01-018")).toBe(3000);
+  });
+
+  test("declining the DON!! -2 changes nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-034"], activeDon: 10 },
+      { character: ["EB01-018"] },
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("EB05-034", "south");
+    e.decline("south");
+    expect(powerOf(e, "north", "EB01-018")).toBe(7000);
+    expect(south(e).donDeckCount).toBe(donDeck);
+  });
+
+  test("with only 6 DON!! after paying, nothing happens", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-034"], activeDon: 8 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("EB05-034", "south");
+    e.accept("south");
+    payReturnDon(e, 2);
+    expect(powerOf(e, "north", "EB01-018")).toBe(7000);
+  });
+});
+
+describe("EB05-035 Speed", () => {
+  test("On Play DON!! -1: top 5, up to 2 {SMILE} cards to hand, then play up to 2 ≤5000-power {SMILE}", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["EB05-035"],
+        deck: ["EB01-025", "OP02-077", "OP01-107", "EB01-005", "OP01-012", "EB01-018"],
+        activeDon: 7,
+      },
+      {},
+    );
+    e.playCard("EB05-035", "south");
+    e.accept("south");
+    payReturnDon(e, 1);
+    e.choose("effectSearchSelection", ["EB01-025", "OP01-107"], "south");
+    keepRemainderOrder(e);
+    expect(candidates(e, "effectPlaySelection")).toEqual(["EB01-025"]);
+    e.choose("effectPlaySelection", ["EB01-025"], "south");
+    expect(ids(south(e).characters)).toEqual(expect.arrayContaining(["EB05-035", "EB01-025"]));
+    expect(ids(south(e).hand)).toEqual(["OP01-107"]);
+  });
+
+  test("declining the DON!! -1 searches nothing", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-035"], deck: 6, activeDon: 7 }, {});
+    e.playCard("EB05-035", "south");
+    e.decline("south");
+    expect(south(e).deckCount).toBe(6);
+    expect(south(e).hand).toEqual([]);
+  });
+});
+
+describe("EB05-036 Tsuru", () => {
+  test("On Play with a {Navy} Leader draws 1 and adds 1 rested DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP05-022", hand: ["EB05-036"], deck: 3, activeDon: 4 },
+      {},
+    );
+    e.playCard("EB05-036", "south");
+    if (e.hasPendingChoice("south")) e.resolveDecision("effectAddDon", { optionId: "1" }, "south");
+    expect(south(e).hand).toHaveLength(1);
+    expect(south(e).restedDon).toBe(5);
+  });
+
+  test("On Play does nothing without a {Navy} Leader", () => {
+    const e = OnePieceTestEngine.create({ hand: ["EB05-036"], deck: 3, activeDon: 4 }, {});
+    e.playCard("EB05-036", "south");
+    expect(south(e).deckCount).toBe(3);
+    expect(south(e).restedDon).toBe(4);
   });
 });
