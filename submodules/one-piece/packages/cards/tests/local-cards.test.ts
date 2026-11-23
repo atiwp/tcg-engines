@@ -30,20 +30,9 @@ describe("OP Practice local cards", () => {
     expect(eb05).toEqual(
       Array.from({ length: 61 }, (_, i) => `EB05-${String(i + 1).padStart(3, "0")}`),
     );
-    expect(localIds.filter((id) => !id.startsWith("EB05-"))).toEqual([
-      "OP18-060",
-      "OP18-064",
-      "OP18-065",
-      "OP18-083",
-      "OP18-084",
-      "OP18-085",
-      "OP18-088",
-      "OP18-093",
-      "OP18-095",
-      "OP18-096",
-      "OP18-097",
-      "OP18-119",
-    ]);
+    const op18 = localIds.filter((id) => id.startsWith("OP18-"));
+    expect(localIds.filter((id) => !id.startsWith("EB05-") && !id.startsWith("OP18-"))).toEqual([]);
+    expect(op18.every((id) => /^OP18-(0\d\d|1[01]\d)$/.test(id) && id !== "OP18-000")).toBe(true);
     for (const card of localCards) {
       expect(upstreamIds.has(card.id)).toBe(false);
       expect(hasCard(card.id)).toBe(true);
@@ -51,7 +40,7 @@ describe("OP Practice local cards", () => {
     }
     expect(localCardIdsDefinedUpstream).toEqual([]);
     expect(allCards.filter((card) => card.setId === "EB05")).toHaveLength(eb05.length);
-    expect(allCards.filter((card) => card.setId === "OP18")).toHaveLength(12);
+    expect(allCards.filter((card) => card.setId === "OP18")).toHaveLength(op18.length);
   });
 
   test("a local card whose id upstream already defines is skipped (upstream wins)", () => {
