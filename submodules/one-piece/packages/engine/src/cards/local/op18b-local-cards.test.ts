@@ -528,3 +528,498 @@ describe("OP18-020 Stop Fighting!!!", () => {
     expect(south(e).lifeCount).toBe(2);
   });
 });
+
+const restedLeader = (e: Engine) => e.getState().cards[e.leader("south")]!.rested;
+
+describe("OP18-021 Franky (Leader)", () => {
+  test("Activate: Main DON!! -1: play a cost 5 or less Stage from hand, once per turn", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-021", hand: ["EB01-011", "EB01-011"], activeDon: 3 },
+      {},
+    );
+    e.activateMain(e.leader("south"), "south");
+    e.accept("south");
+    payReturnDon(e);
+    e.choose("effectPlaySelection", [e.getState().players.south.hand[0]!], "south");
+    expect(e.getState().players.south.stageArea).not.toBeNull();
+    expect(
+      e.expectFailure({
+        type: "activateEffect",
+        seat: "south",
+        sourceInstanceId: e.leader("south"),
+        trigger: "activateMain",
+      }).accepted,
+    ).toBe(false);
+  });
+
+  test("declining keeps the DON!! and the hand", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-021", hand: ["EB01-011"], activeDon: 3 },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.activateMain(e.leader("south"), "south");
+    e.decline("south");
+    expect(south(e).donDeckCount).toBe(donDeck);
+    expect(ids(south(e).hand)).toEqual(["EB01-011"]);
+  });
+});
+
+/** Pay a DON!! -N cost with the first offered DON!! if the engine asks. */
+function payReturnDon(e: Engine, n = 1): void {
+  if (!pending(e, "south", "effectCostReturnDon")) return;
+  const step = e.pendingDecision("effectCostReturnDon", "south").steps[0];
+  if (step?.kind !== "payCost") throw new Error("Expected a DON!! return.");
+  e.resolveDecision(
+    "effectCostReturnDon",
+    { selectedIds: step.candidates.slice(0, n).map((c) => c.ref.id) },
+    "south",
+  );
+}
+
+describe("OP18-022 Monkey.D.Luffy (Leader)", () => {
+  test("DON!! x3 When Attacking: set this Leader active; it then stays rested-free next Refresh", () => {
+    const e = OnePieceTestEngine.create({ leaderCardId: "OP18-022", activeDon: 3 }, {});
+    e.attachDon(e.leader("south"), 3, "south");
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.accept("south");
+    expect(restedLeader(e)).toBe(false);
+    const flags = Object.values(e.getState().modifiers).map((m) => JSON.stringify(m));
+    expect(flags.some((m) => m.includes(e.leader("south")) && /freeze/i.test(m))).toBe(true);
+  });
+
+  test("declining leaves the Leader rested; without 3 DON!! nothing is offered", () => {
+    const e = OnePieceTestEngine.create({ leaderCardId: "OP18-022", activeDon: 3 }, {});
+    e.attachDon(e.leader("south"), 3, "south");
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.decline("south");
+    expect(restedLeader(e)).toBe(true);
+    const f = OnePieceTestEngine.create({ leaderCardId: "OP18-022", activeDon: 2 }, {});
+    f.attachDon(f.leader("south"), 2, "south");
+    f.declareAttack(f.leader("south"), f.leader("north"), "south");
+    expect(pending(f, "south", "effectOptional")).toBe(false);
+  });
+});
+
+describe("OP18-023 Gaimon", () => {
+  test("On Play: an East Blue Leader or Character gains [Banish] this turn", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-023"], character: ["EB05-057"], activeDon: 1 },
+      {},
+    );
+    e.playCard("OP18-023", "south");
+    const target = e.findCardInZone("south", "character", "EB05-057");
+    expect(candidates(e, "effectTargetSelection")).toContain("EB05-057");
+    e.choose("effectTargetSelection", [target], "south");
+    expect(hasGranted(e, target, "banish")).toBe(true);
+  });
+});
+
+describe("OP18-024 Kokoro", () => {
+  test("[Blocker]; End of Your Turn: trash this to set the Leader active", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-024"], activeDon: 0 }, {});
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    expect(restedLeader(e)).toBe(true);
+    e.endTurn("south");
+    e.accept("south");
+    expect(ids(south(e).trash)).toEqual(["OP18-024"]);
+    expect(restedLeader(e)).toBe(false);
+  });
+
+  test("declining keeps Kokoro and the Leader rested", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-024"] }, {});
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.endTurn("south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP18-024");
+    expect(restedLeader(e)).toBe(true);
+  });
+});
+
+describe("OP18-025 Gonbe", () => {
+  test("End of Your Turn: if this Character is rested, set the Leader active", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-025" }, rested: true }] },
+      {},
+    );
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.endTurn("south");
+    expect(restedLeader(e)).toBe(false);
+  });
+
+  test("an active Gonbe does nothing", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-025"] }, {});
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.endTurn("south");
+    expect(restedLeader(e)).toBe(true);
+  });
+});
+
+describe("OP18-026 Sanji", () => {
+  test("a Straw Hat Crew Character removed by an opponent's effect: trash Sanji instead (or decline)", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: ["OP18-026", "OP18-036"] },
+        { hand: ["OP13-013"], activeDon: 3 },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    e.playCard("OP13-013", "north");
+    e.choose(
+      "effectTargetSelection",
+      [e.findCardInZone("south", "character", "OP18-036")],
+      "north",
+    );
+    e.resolveDecision("effectKoReplacement", { optionId: "yes" }, "south");
+    expect(ids(south(e).characters)).toContain("OP18-036");
+    expect(ids(south(e).trash)).toEqual(["OP18-026"]);
+
+    const d = make();
+    d.playCard("OP13-013", "north");
+    d.choose(
+      "effectTargetSelection",
+      [d.findCardInZone("south", "character", "OP18-036")],
+      "north",
+    );
+    d.resolveDecision("effectKoReplacement", { optionId: "no" }, "south");
+    expect(ids(south(d).trash)).toEqual(["OP18-036"]);
+  });
+});
+
+describe("OP18-027 Zoro & Sogeking", () => {
+  test("Opponent's Turn: the active Luffy Leader with 3+ DON!! has base power 7000", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-022", character: ["OP18-027"], activeDon: 3 },
+      {},
+    );
+    e.attachDon(e.leader("south"), 3, "south");
+    e.endTurn("south");
+    expect(south(e).leader?.power).toBe(7000);
+  });
+
+  test("On Play: set 2 DON!! active; an opposing cost 6 or less Character cannot be rested", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-027"], activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-027", "south");
+    e.resolveDecision("effectSetActiveDon", { optionId: "2" }, "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(south(e).activeDon).toBe(2);
+    const god = e.findCardInZone("north", "character", "EB01-018");
+    expect(Object.values(e.getState().modifiers).some((m) => JSON.stringify(m).includes(god))).toBe(
+      true,
+    );
+  });
+});
+
+describe("OP18-028 Chimney", () => {
+  test("Activate: Main rest a [Gonbe] and this: set the Luffy Leader active", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-022", character: ["OP18-028", "OP18-025"] },
+      {},
+    );
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    if (pending(e, "south", "effectOptional")) e.decline("south");
+    expect(restedLeader(e)).toBe(true);
+    e.activateMain("OP18-028", "south");
+    e.accept("south");
+    expect(restedLeader(e)).toBe(false);
+    expect(south(e).characters.filter((c) => c?.rested)).toHaveLength(2);
+  });
+
+  test("declining keeps both active", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-022", character: ["OP18-028", "OP18-025"] },
+      {},
+    );
+    e.activateMain("OP18-028", "south");
+    e.decline("south");
+    expect(south(e).characters.filter((c) => c?.rested)).toHaveLength(0);
+  });
+});
+
+describe("OP18-029 Tony Tony.Chopper", () => {
+  test("When Attacking once per turn: give up to 3 rested DON!! to the Leader and set this active", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-029" }, playedOnTurn: 0 }], restedDon: 3 },
+      {},
+    );
+    e.attack("OP18-029", e.leader("north"), "south");
+    e.chooseAmount(3, "south");
+    expect(e.getState().cards[e.leader("south")]?.attachedDon).toBe(3);
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-029")?.rested).toBe(false);
+  });
+});
+
+describe("OP18-030 Nami", () => {
+  test("Opponent's Turn: rested, this Character has -2000 power", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-030" }, rested: true }, "OP18-030"] },
+      {},
+    );
+    e.endTurn("south");
+    const powers = south(e)
+      .characters.filter((c) => c?.cardId === "OP18-030")
+      .map((c) => c?.power);
+    expect(powers.sort((a, b) => Number(a) - Number(b))).toEqual([4000, 6000]);
+  });
+});
+
+describe("OP18-031 Nico Robin", () => {
+  test("Opponent's Turn: a Character removed by an opponent's effect: rest Robin instead", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-031", "OP18-012"] },
+      { hand: ["OP13-013"], activeDon: 3 },
+      { activeSeat: "north" },
+    );
+    e.playCard("OP13-013", "north");
+    e.choose(
+      "effectTargetSelection",
+      [e.findCardInZone("south", "character", "OP18-012")],
+      "north",
+    );
+    e.resolveDecision("effectKoReplacement", { optionId: "yes" }, "south");
+    expect(ids(south(e).characters)).toContain("OP18-012");
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-031")?.rested).toBe(true);
+  });
+
+  test("End of Your Turn: set a Water Seven card and a DON!! active", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-031", { card: { id: "OP18-035" }, rested: true }], restedDon: 1 },
+      {},
+    );
+    e.endTurn("south");
+    if (pending(e, "south", "effectTargetSelection")) {
+      e.choose("effectTargetSelection", ["OP18-035"], "south");
+    }
+    if (pending(e, "south", "effectSetActiveDon")) {
+      e.resolveDecision("effectSetActiveDon", { optionId: "1" }, "south");
+    }
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-035")?.rested).toBe(false);
+  });
+});
+
+describe("OP18-032 Buggy", () => {
+  test("On Play: a rested ≤8000-power Character stays rested in the next Refresh Phase", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-032"], activeDon: 5 },
+      { character: [{ card: { id: "EB01-018" }, rested: true }] },
+    );
+    e.playCard("OP18-032", "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    e.endTurn("south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+  });
+
+  test("On K.O. does the same", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-032" }, rested: true }] },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    northKos(e, "OP18-032");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-041"]);
+  });
+});
+
+describe("OP18-033 Banban", () => {
+  test("[Blocker]; End of Your Turn: trash this to set a Character active", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-033", { card: { id: "OP18-035" }, rested: true }] },
+      {},
+    );
+    e.endTurn("south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["OP18-035"], "south");
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-035")?.rested).toBe(false);
+    expect(ids(south(e).trash)).toEqual(["OP18-033"]);
+  });
+
+  test("declining keeps Banban", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-033", { card: { id: "OP18-035" }, rested: true }] },
+      {},
+    );
+    e.endTurn("south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP18-033");
+  });
+});
+
+describe("OP18-034 Franky", () => {
+  test("On Play: play a Franky Family/Straw Hat Crew card ≤5; with a cost 5+ Stage, rest a ≤6 Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-034", "OP18-036"], stage: "OP05-040", activeDon: 6 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-034", "south");
+    e.choose("effectPlaySelection", ["OP18-036"], "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(ids(south(e).characters)).toContain("OP18-036");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+  });
+
+  test("without a cost 5+ Stage nothing is rested", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-034"], activeDon: 6 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-034", "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(false);
+  });
+});
+
+describe("OP18-035 Michael & Hoichael (no text on the official card list: vanilla)", () => {
+  test("plays as a 3-cost 5000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["OP18-035"], activeDon: 3 }, {});
+    e.playCard("OP18-035", "south");
+    expect(powerOf(e, "south", "OP18-035")).toBe(5000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("OP18-036 Monkey.D.Luffy", () => {
+  test("End of Your Turn: trash this: draw 1 and set the Leader active", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-036"], deck: 3 }, {});
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.endTurn("south");
+    e.accept("south");
+    expect(restedLeader(e)).toBe(false);
+    expect(ids(south(e).trash)).toEqual(["OP18-036"]);
+    expect(south(e).deckCount).toBe(2);
+  });
+
+  test("declining keeps Luffy and the deck", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-036"], deck: 3 }, {});
+    e.declareAttack(e.leader("south"), e.leader("north"), "south");
+    e.endTurn("south");
+    e.decline("south");
+    expect(south(e).deckCount).toBe(3);
+    expect(restedLeader(e)).toBe(true);
+  });
+});
+
+describe("OP18-037 Yokozuna", () => {
+  test("[Blocker]; On K.O. rests an opposing card", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-037" }, rested: true }] },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }, "EB01-018"] },
+      { activeSeat: "north" },
+    );
+    northKos(e, "OP18-037");
+    const target = e.findCardInZone("north", "character", "EB01-018");
+    const intent = e
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south")
+      ?.resolutionContext?.intent;
+    e.resolveDecision(intent as never, { selectedIds: [target] }, "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+  });
+});
+
+describe("OP18-038 Shoot Down That Flag.", () => {
+  test("Main: top 5, a [Sogeking] or Straw Hat Crew card to hand", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["OP18-038"],
+        deck: ["OP18-036", "EB01-005", "OP01-012", "EB01-018", "EB01-005", "EB01-005"],
+        activeDon: 1,
+      },
+      {},
+    );
+    e.playCard("OP18-038", "south");
+    expect(() => e.choose("effectSearchSelection", ["OP01-012"], "south")).toThrow();
+    e.choose("effectSearchSelection", ["OP18-036"], "south");
+    if (pending(e, "south", "effectSearchRemainderOrder")) {
+      const step = e.pendingDecision("effectSearchRemainderOrder", "south").steps[0];
+      if (step?.kind === "orderItems") {
+        e.resolveDecision(
+          "effectSearchRemainderOrder",
+          { selectedIds: step.candidates.map((c) => c.ref.id) },
+          "south",
+        );
+      }
+    }
+    expect(ids(south(e).hand)).toEqual(["OP18-036"]);
+  });
+
+  test("Trigger draws 1", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["OP18-038", "EB01-005"], deck: 3 },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    expect(south(e).deckCount).toBe(2);
+  });
+});
+
+describe("OP18-039 Gum-Gum Giant Axe", () => {
+  test("Counter: a [Monkey.D.Luffy] +2000; with the Leader active, draw 1", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-022", hand: ["OP18-039"], deck: 3, activeDon: 1 },
+      { character: [{ card: { id: "EB02-034" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    e.declareAttack(e.findCardInZone("north", "character", "EB02-034"), e.leader("south"), "north");
+    e.resolveDecision(
+      "battleCounter",
+      { selectedIds: [e.findCardInZone("south", "hand", "OP18-039")] },
+      "south",
+    );
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+    expect(south(e).deckCount).toBe(2);
+    expect(south(e).lifeCount).toBe(life);
+  });
+});
+
+describe("OP18-040 Diable Jambe Flambé Shot", () => {
+  test("Main: K.O. an opposing rested cost 7 or less Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-040"], activeDon: 4 },
+      { character: [{ card: { id: "EB01-018" }, rested: true }, "EB01-005"] },
+    );
+    e.playCard("OP18-040", "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-018"]);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(ids(north(e).trash)).toEqual(["EB01-018"]);
+  });
+
+  test("Trigger: rest an opposing cost 7 or less Character", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["OP18-040", "EB01-005"] },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(north(e).characters.find((c) => c?.cardId === "EB01-018")?.rested).toBe(true);
+  });
+});
+
+describe("OP18-118 Monkey.D.Luffy", () => {
+  test("On Play: set 3 DON!! active; an opposing Character cannot be rested", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-118"], activeDon: 9 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-118", "south");
+    e.resolveDecision("effectSetActiveDon", { optionId: "3" }, "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(south(e).activeDon).toBe(3);
+  });
+
+  test("End of Your Turn: set a Water Seven card active", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-118", { card: { id: "OP18-035" }, rested: true }] },
+      {},
+    );
+    e.endTurn("south");
+    e.choose("effectTargetSelection", ["OP18-035"], "south");
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-035")?.rested).toBe(false);
+  });
+});
