@@ -567,11 +567,16 @@ describe("OP18-021 Franky (Leader)", () => {
 
 /** Pay a DON!! -N cost with the first offered DON!! if the engine asks. */
 function payReturnDon(e: Engine, n = 1): void {
-  if (!pending(e, "south", "effectCostReturnDon")) return;
-  const step = e.pendingDecision("effectCostReturnDon", "south").steps[0];
+  const intent = pending(e, "south", "effectCostReturnDon")
+    ? "effectCostReturnDon"
+    : pending(e, "south", "effectReturnDon")
+      ? "effectReturnDon"
+      : null;
+  if (!intent) return;
+  const step = e.pendingDecision(intent, "south").steps[0];
   if (step?.kind !== "payCost") throw new Error("Expected a DON!! return.");
   e.resolveDecision(
-    "effectCostReturnDon",
+    intent,
     { selectedIds: step.candidates.slice(0, n).map((c) => c.ref.id) },
     "south",
   );
@@ -1529,5 +1534,459 @@ describe("OP18-059 I Pray For Your Success.", () => {
     f.accept("south");
     f.resolveDecision("effectTargetSelection", { selectedIds: [f.leader("south")] }, "south");
     expect(south(f).lifeCount).toBe(life);
+  });
+});
+
+const stageOf = (e: Engine) => {
+  const id = e.getState().players.south.stageArea;
+  return id ? e.getState().cards[id]!.cardId : null;
+};
+const addDonIfAsked = (e: Engine, n: string) => {
+  if (pending(e, "south", "effectAddDon"))
+    e.resolveDecision("effectAddDon", { optionId: n }, "south");
+};
+
+describe("OP18-061 Iceburg", () => {
+  test("On Play: top 5, up to 2 Stage or Water Seven cards to hand", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["OP18-061"],
+        deck: ["OP18-075", "OP18-035", "EB01-005", "EB01-018", "OP01-012", "EB01-005"],
+        activeDon: 2,
+      },
+      {},
+    );
+    e.playCard("OP18-061", "south");
+    expect(() => e.choose("effectSearchSelection", ["EB01-018"], "south")).toThrow();
+    e.choose("effectSearchSelection", ["OP18-075", "OP18-035"], "south");
+    keepOrder(e, "effectSearchRemainderOrder");
+    expect(ids(south(e).hand).sort(byText)).toEqual(["OP18-035", "OP18-075"]);
+  });
+});
+
+describe("OP18-062 Oimo & Kashii (no text on the official card list: vanilla)", () => {
+  test("plays as an 8-cost 10000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["OP18-062"], activeDon: 8 }, {});
+    e.playCard("OP18-062", "south");
+    expect(powerOf(e, "south", "OP18-062")).toBe(10000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("OP18-063 Kiwi & Mozu", () => {
+  test("On Play: give up a cost 5 or less Stage: add 1 rested DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-063"], stage: "OP18-075", activeDon: 3 },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("OP18-063", "south");
+    e.accept("south");
+    addDonIfAsked(e, "1");
+    expect(stageOf(e)).toBeNull();
+    expect(south(e).donDeckCount).toBe(donDeck - 1);
+  });
+
+  test("declining keeps the Stage", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-063"], stage: "OP18-075", activeDon: 3 },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("OP18-063", "south");
+    e.decline("south");
+    expect(stageOf(e)).toBe("OP18-075");
+    expect(ids(south(e).trash)).toEqual([]);
+    expect(south(e).donDeckCount).toBe(donDeck);
+  });
+});
+
+describe("OP18-066 Zambai", () => {
+  test("Activate: Main give up a cost 5 or less Stage: [Rush] this turn", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-066"], stage: "OP18-075", activeDon: 5 },
+      {},
+    );
+    e.playCard("OP18-066", "south");
+    e.activateMain("OP18-066", "south");
+    e.accept("south");
+    const life = north(e).lifeCount;
+    e.attack("OP18-066", e.leader("north"), "south");
+    expect(north(e).lifeCount).toBe(life - 1);
+  });
+
+  test("declining keeps the Stage", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-066"], stage: "OP18-075" }, {});
+    e.activateMain("OP18-066", "south");
+    e.decline("south");
+    expect(stageOf(e)).toBe("OP18-075");
+    expect(ids(south(e).trash)).toEqual([]);
+  });
+});
+
+describe("OP18-067 Charlotte Smoothie", () => {
+  test("On Play: trash a Big Mom Pirates card to draw 2", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-067", "OP03-103"], deck: 3, activeDon: 1 },
+      {},
+    );
+    e.playCard("OP18-067", "south");
+    e.accept("south");
+    expect(ids(south(e).trash)).toEqual(["OP03-103"]);
+    expect(south(e).hand).toHaveLength(2);
+  });
+
+  test("declining draws nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-067", "OP03-103"], deck: 3, activeDon: 1 },
+      {},
+    );
+    e.playCard("OP18-067", "south");
+    e.decline("south");
+    expect(south(e).deckCount).toBe(3);
+  });
+});
+
+describe("OP18-068 Senor Pink", () => {
+  test("once per turn, a K.O. is replaced by DON!! -1; declining lets it go", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: [{ card: { id: "OP18-068" }, rested: true }], activeDon: 3 },
+        { character: [{ card: { id: "EB01-055" }, playedOnTurn: 0 }] },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    const donDeck = south(e).donDeckCount;
+    e.declareAttack(
+      e.findCardInZone("north", "character", "EB01-055"),
+      e.findCardInZone("south", "character", "OP18-068"),
+      "north",
+    );
+    e.resolveDecision("battleKoReplacement", { optionId: "yes" }, "south");
+    payReturnDon(e);
+    expect(ids(south(e).characters)).toContain("OP18-068");
+    expect(south(e).donDeckCount).toBe(donDeck + 1);
+    const d = make();
+    d.declareAttack(
+      d.findCardInZone("north", "character", "EB01-055"),
+      d.findCardInZone("south", "character", "OP18-068"),
+      "north",
+    );
+    d.resolveDecision("battleKoReplacement", { optionId: "no" }, "south");
+    expect(ids(south(d).trash)).toEqual(["OP18-068"]);
+  });
+
+  test("On Play DON!! -1: an opposing cost 7 or less Character cannot be rested", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-068"], activeDon: 9 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-068", "south");
+    e.accept("south");
+    payReturnDon(e);
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    const god = e.findCardInZone("north", "character", "EB01-018");
+    expect(Object.values(e.getState().modifiers).some((m) => JSON.stringify(m).includes(god))).toBe(
+      true,
+    );
+  });
+
+  test("declining the On Play DON!! -1 keeps the DON!! and restricts nothing", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-068"], activeDon: 9 },
+      { character: ["EB01-018"] },
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("OP18-068", "south");
+    e.decline("south");
+    expect(south(e).donDeckCount).toBe(donDeck);
+    expect(Object.keys(e.getState().modifiers)).toHaveLength(0);
+  });
+});
+
+describe("OP18-069 Sodomu & Gomora", () => {
+  test("a Franky Family Character K.O.'d: DON!! -1 and rest this instead; declining lets it go", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: ["OP18-069", { card: { id: "OP18-072" }, rested: true }], activeDon: 2 },
+        attacker8000,
+        { activeSeat: "north" },
+      );
+    const e = make();
+    northKos(e, "OP18-072");
+    e.resolveDecision("battleKoReplacement", { optionId: "yes" }, "south");
+    payReturnDon(e);
+    expect(ids(south(e).characters)).toContain("OP18-072");
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-069")?.rested).toBe(true);
+    const d = make();
+    northKos(d, "OP18-072");
+    d.resolveDecision("battleKoReplacement", { optionId: "no" }, "south");
+    expect(ids(south(d).trash)).toEqual(["OP18-072"]);
+  });
+});
+
+describe("OP18-070 Tom", () => {
+  test("On Play DON!! -1 and trash 1: up to 2 Stages from trash to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-070", "EB01-005"], trash: ["OP18-075", "OP18-076", "EB01-018"], activeDon: 3 },
+      {},
+    );
+    e.playCard("OP18-070", "south");
+    e.accept("south");
+    payReturnDon(e);
+    e.choose("effectTargetSelection", ["OP18-075", "OP18-076"], "south");
+    expect(ids(south(e).hand).sort(byText)).toEqual(["OP18-075", "OP18-076"]);
+  });
+
+  test("declining keeps the hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-070", "EB01-005"], trash: ["OP18-075"], activeDon: 3 },
+      {},
+    );
+    e.playCard("OP18-070", "south");
+    e.decline("south");
+    expect(ids(south(e).hand)).toEqual(["EB01-005"]);
+  });
+});
+
+describe("OP18-071 Trebol", () => {
+  test("a Donquixote Pirates Character removed by an opponent's effect: DON!! -1 instead (or decline)", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: ["OP18-071"], activeDon: 2 },
+        { hand: ["EB05-029", "OP01-012"], activeDon: 6 },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    e.playCard("EB05-029", "north");
+    e.accept("north");
+    e.choose(
+      "effectTargetSelection",
+      [e.findCardInZone("south", "character", "OP18-071")],
+      "north",
+    );
+    const intent = e
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south")
+      ?.resolutionContext?.intent;
+    e.resolveDecision(intent as never, { optionId: "yes" }, "south");
+    payReturnDon(e);
+    expect(ids(south(e).characters)).toContain("OP18-071");
+    const d = make();
+    d.playCard("EB05-029", "north");
+    d.accept("north");
+    d.choose(
+      "effectTargetSelection",
+      [d.findCardInZone("south", "character", "OP18-071")],
+      "north",
+    );
+    const intent2 = d
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south")
+      ?.resolutionContext?.intent;
+    d.resolveDecision(intent2 as never, { optionId: "no" }, "south");
+    expect(ids(south(d).hand)).toContain("OP18-071");
+  });
+
+  test("Opponent's Turn with a [Sugar] Leader: [Blocker] and +2000; otherwise neither", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP10-003", character: ["OP18-071"] },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+    );
+    expect(powerOf(e, "south", "OP18-071")).toBe(6000);
+    e.endTurn("south");
+    expect(powerOf(e, "south", "OP18-071")).toBe(8000);
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    expect(candidates(e, "battleBlocker").filter(Boolean)).toContain("OP18-071");
+    const f = OnePieceTestEngine.create({ character: ["OP18-071"] }, {});
+    f.endTurn("south");
+    expect(powerOf(f, "south", "OP18-071")).toBe(6000);
+  });
+});
+
+describe("OP18-072 The Franky Family", () => {
+  test("[Blocker]; Activate: Main once per turn: give up a Stage: if played this turn, -3000", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-072"], stage: "OP18-075", activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-072", "south");
+    e.activateMain("OP18-072", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(powerOf(e, "north", "EB01-018")).toBe(4000);
+  });
+
+  test("not played this turn: the Stage is paid, no power change; declining keeps it", () => {
+    const e = OnePieceTestEngine.create(
+      { character: ["OP18-072"], stage: "OP18-075" },
+      { character: ["EB01-018"] },
+    );
+    e.activateMain("OP18-072", "south");
+    e.decline("south");
+    expect(stageOf(e)).toBe("OP18-075");
+    e.activateMain("OP18-072", "south");
+    e.accept("south");
+    expect(stageOf(e)).toBeNull();
+    expect(powerOf(e, "north", "EB01-018")).toBe(7000);
+  });
+});
+
+describe("OP18-073 T-Bone (no text on the official card list: vanilla)", () => {
+  test("plays as a 5-cost 7000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["OP18-073"], activeDon: 5 }, {});
+    e.playCard("OP18-073", "south");
+    expect(powerOf(e, "south", "OP18-073")).toBe(7000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("OP18-074 Can You Please Sail on the Ship I Made?!", () => {
+  test("Counter with a cost 5+ Stage: +4000; without one, nothing", () => {
+    const run = (stage: string | null) => {
+      const e = OnePieceTestEngine.create(
+        { hand: ["OP18-074"], stage, activeDon: 1 },
+        { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+        { activeSeat: "north" },
+      );
+      const life = south(e).lifeCount;
+      e.declareAttack(
+        e.findCardInZone("north", "character", "EB01-018"),
+        e.leader("south"),
+        "north",
+      );
+      e.resolveDecision(
+        "battleCounter",
+        { selectedIds: [e.findCardInZone("south", "hand", "OP18-074")] },
+        "south",
+      );
+      if (pending(e, "south", "effectTargetSelection")) {
+        e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+      }
+      return south(e).lifeCount - life;
+    };
+    expect(run("OP18-075")).toBe(0);
+    expect(run(null)).toBe(-1);
+  });
+
+  test("Trigger DON!! -1: up to 2 Stages from trash to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { life: ["OP18-074", "EB01-005"], trash: ["OP18-075"], activeDon: 2 },
+      {},
+      { activeSeat: "north" },
+    );
+    e.declareAttack(e.leader("north"), e.leader("south"), "north");
+    e.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    e.accept("south");
+    payReturnDon(e);
+    e.choose("effectTargetSelection", ["OP18-075"], "south");
+    expect(ids(south(e).hand)).toContain("OP18-075");
+  });
+});
+
+describe("OP18-075 Thousand Sunny", () => {
+  test("On Play: draw 1 and add a rested DON!!; Activate: Main DON!! -2 and rest: set a ≤7000 Straw Hat Crew Character active", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["OP18-075"],
+        character: [{ card: { id: "OP18-036" }, rested: true }],
+        deck: 3,
+        activeDon: 5,
+      },
+      {},
+    );
+    const donDeck = south(e).donDeckCount;
+    e.playCard("OP18-075", "south");
+    addDonIfAsked(e, "1");
+    expect(south(e).hand).toHaveLength(1);
+    expect(south(e).donDeckCount).toBe(donDeck - 1);
+    e.activateMain("OP18-075", "south");
+    e.accept("south");
+    payReturnDon(e, 2);
+    e.choose("effectTargetSelection", ["OP18-036"], "south");
+    expect(south(e).characters.find((c) => c?.cardId === "OP18-036")?.rested).toBe(false);
+  });
+
+  test("declining the Activate keeps the DON!!", () => {
+    const e = OnePieceTestEngine.create({ stage: "OP18-075", activeDon: 3 }, {});
+    const donDeck = south(e).donDeckCount;
+    e.activateMain("OP18-075", "south");
+    e.decline("south");
+    expect(south(e).donDeckCount).toBe(donDeck);
+  });
+});
+
+describe("OP18-076 Shark Submerge 3", () => {
+  test("On Your Opponent's Attack: rest this: a ≤5000 Leader and up to 2 Characters +1000", () => {
+    const e = OnePieceTestEngine.create(
+      { stage: "OP18-076", character: ["EB01-005"] },
+      { character: [{ card: { id: "EB02-029" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    e.declareAttack(e.findCardInZone("north", "character", "EB02-029"), e.leader("south"), "north");
+    e.accept("south");
+    if (pending(e, "south", "effectTargetSelection"))
+      e.choose("effectTargetSelection", ["EB01-005"], "south");
+    expect(powerOf(e, "south", "EB01-005")).toBe(4000);
+    expect(south(e).lifeCount).toBe(life);
+  });
+
+  test("declining keeps the Stage active and the Leader takes the hit", () => {
+    const e = OnePieceTestEngine.create(
+      { stage: "OP18-076" },
+      { character: [{ card: { id: "EB02-029" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(e).lifeCount;
+    e.declareAttack(e.findCardInZone("north", "character", "EB02-029"), e.leader("south"), "north");
+    e.decline("south");
+    expect(south(e).lifeCount).toBe(life - 1);
+  });
+});
+
+describe("OP18-077 White Hobby Horse 1", () => {
+  test("Activate: Main rest this: a Straw Hat Crew Character gains [Rush: Character]", () => {
+    const e = OnePieceTestEngine.create(
+      { stage: "OP18-077", hand: ["OP18-036"], activeDon: 2 },
+      {},
+    );
+    e.playCard("OP18-036", "south");
+    e.activateMain("OP18-077", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["OP18-036"], "south");
+    expect(hasGranted(e, e.findCardInZone("south", "character", "OP18-036"), "rushCharacter")).toBe(
+      true,
+    );
+  });
+
+  test("declining keeps the Stage active", () => {
+    const e = OnePieceTestEngine.create({ stage: "OP18-077", character: ["OP18-036"] }, {});
+    e.activateMain("OP18-077", "south");
+    e.decline("south");
+    const stage = e.getState().players.south.stageArea!;
+    expect(e.getState().cards[stage]?.rested).toBe(false);
+  });
+});
+
+describe("OP18-078 Mini-Merry", () => {
+  test("Activate: Main rest this: up to 4 of your Leader or Characters get 1 rested DON!! each", () => {
+    const e = OnePieceTestEngine.create(
+      { stage: "OP18-078", character: ["EB01-005"], restedDon: 4 },
+      {},
+    );
+    e.activateMain("OP18-078", "south");
+    e.accept("south");
+    const doma = e.findCardInZone("south", "character", "EB01-005");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south"), doma] }, "south");
+    expect(e.getState().cards[e.leader("south")]?.attachedDon).toBe(1);
+    expect(e.getState().cards[doma]?.attachedDon).toBe(1);
+  });
+
+  test("declining gives nothing", () => {
+    const e = OnePieceTestEngine.create({ stage: "OP18-078", restedDon: 4 }, {});
+    e.activateMain("OP18-078", "south");
+    e.decline("south");
+    expect(e.getState().cards[e.leader("south")]?.attachedDon).toBe(0);
   });
 });
