@@ -94,9 +94,9 @@ export function commandFromDescriptor(
       return { type: "endTurn", seat };
     case "playCard": {
       if (!descriptor.sourceId) return null;
-      if (descriptor.slotChoices !== undefined && descriptor.slotChoices.length === 0) {
-        return null;
-      }
+      // OP Practice fork fix (user-approved 2026-11-23): a full Character area has
+      // `slotChoices: []`; play without a slotIndex so applyCommand opens the rule 3-7-6-1
+      // prompt (trash one of your Characters) instead of making the play unbuildable.
       return {
         type: "playCard",
         seat,
