@@ -1685,6 +1685,12 @@ export interface GameLogEntry {
   message: string;
   privateMessages: Partial<Record<MatchSeat, string>>;
   judgeMessage: string | null;
+  /**
+   * OP Practice fork fix (user-approved 2026-11-23): for each card instance the entry names, the
+   * seats that could see that card when the entry was logged. The player view uses it to keep
+   * hidden identities out of the other seat's logs.
+   */
+  identityVisibleTo?: Record<string, MatchSeat[]>;
 }
 
 export interface DelayedEffectAction {

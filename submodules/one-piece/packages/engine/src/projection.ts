@@ -771,18 +771,37 @@ function projectLogs(state: MatchState, viewer: Viewer): ProjectedLogEntry[] {
       continue;
     }
 
+    const message =
+      viewer === "spectator" ? log.message : (log.privateMessages[viewer] ?? log.message);
+    // OP Practice fork fix (user-approved 2026-11-23): a card's ids reach this viewer only if
+    // the viewer could see the card when the entry was logged, or the viewer's message names it.
+    const named = (cardId: string | null | undefined) =>
+      Boolean(cardId) && message.includes(getCardName(getCard(cardId!)));
+    const visible = (id: string) => {
+      const instance = state.cards[id];
+      if (!instance) return true;
+      const seats = log.identityVisibleTo?.[id];
+      return (
+        (viewer !== "spectator" && seats?.includes(viewer) === true) ||
+        (viewer === "spectator" && seats?.length === 2) ||
+        named(instance.cardId)
+      );
+    };
+    const sourceVisible = log.sourceInstanceId
+      ? visible(log.sourceInstanceId)
+      : named(log.sourceCardId);
     projected.push({
       id: log.id,
       turn: log.turn,
       phase: log.phase,
       sequence: log.sequence,
       actor: log.actor,
-      sourceCardId: log.sourceCardId,
-      sourceInstanceId: log.sourceInstanceId,
-      targetIds: log.targetIds,
+      sourceCardId: sourceVisible ? log.sourceCardId : null,
+      sourceInstanceId: sourceVisible ? log.sourceInstanceId : null,
+      targetIds: log.targetIds.filter(visible),
       eventId: log.eventId,
       visibility: log.visibility,
-      message: viewer === "spectator" ? log.message : (log.privateMessages[viewer] ?? log.message),
+      message,
     });
   }
 

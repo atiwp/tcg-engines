@@ -287,6 +287,21 @@ export function emitLog(
     privateMessages: payload.privateMessages ?? {},
     judgeMessage: payload.judgeMessage ?? null,
   };
+  // OP Practice fork fix (user-approved 2026-11-23): record who could see each named card now
+  // (same rule as the player view's card projection), so later views do not leak hidden cards.
+  const identityVisibleTo: Record<string, MatchSeat[]> = {};
+  for (const id of [entry.sourceInstanceId, ...entry.targetIds]) {
+    const instance = id ? state.cards[id] : undefined;
+    if (!id || !instance) continue;
+    identityVisibleTo[id] = (["south", "north"] as const).filter(
+      (seat) =>
+        instance.publicKnowledge ||
+        instance.zone === "leader" ||
+        instance.zone === "character" ||
+        (instance.zone === "hand" && instance.controller === seat),
+    );
+  }
+  entry.identityVisibleTo = identityVisibleTo;
   state.logHistory.push(entry);
   return entry;
 }
