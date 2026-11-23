@@ -32,7 +32,10 @@ describe("OP Practice local cards", () => {
     );
     const op18 = localIds.filter((id) => id.startsWith("OP18-"));
     expect(localIds.filter((id) => !id.startsWith("EB05-") && !id.startsWith("OP18-"))).toEqual([]);
-    expect(op18.every((id) => /^OP18-(0\d\d|1[01]\d)$/.test(id) && id !== "OP18-000")).toBe(true);
+    // Every OP18 card on the official card list, OP18-001 to OP18-119.
+    expect(op18).toEqual(
+      Array.from({ length: 119 }, (_, i) => `OP18-${String(i + 1).padStart(3, "0")}`),
+    );
     for (const card of localCards) {
       expect(upstreamIds.has(card.id)).toBe(false);
       expect(hasCard(card.id)).toBe(true);
