@@ -1,5 +1,5 @@
 import { getCard } from "../../cards/src/runtime-catalog.ts";
-import { selectionRulesForPrompt } from "./selection-rules.ts";
+import { revealedCardIdForPrompt, selectionRulesForPrompt } from "./selection-rules.ts";
 import type { Action, Target, TargetFilter } from "@tcg/op-types";
 import { getLegalCommands } from "./engine/legal.ts";
 import { getCardAttribute, getCardCost, getCardPower, getLeaderLifeValue } from "./shared.ts";
@@ -641,6 +641,8 @@ function projectPromptDecision(state: MatchState, prompt: PromptState): Projecte
     ...(selectionRulesForPrompt(state, prompt)
       ? { selectionRules: selectionRulesForPrompt(state, prompt) }
       : {}),
+    // OP Practice fork fix (user-approved 2026-11-23): the revealed [Trigger] card's id.
+    ...(revealedCardIdForPrompt(prompt) ? { revealedCardId: revealedCardIdForPrompt(prompt) } : {}),
   };
 }
 

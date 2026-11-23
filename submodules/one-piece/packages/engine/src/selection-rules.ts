@@ -41,3 +41,11 @@ export function selectionRulesForPrompt(
   }
   return Object.keys(rules).length > 0 ? rules : undefined;
 }
+
+// OP Practice fork fix (user-approved 2026-11-23): a Life [Trigger] prompt names the card that was
+// revealed for its [Trigger]; that card is public, so its card id may go with the prompt.
+export function revealedCardIdForPrompt(prompt: PromptState): string | undefined {
+  return prompt.resolutionContext?.intent === "lifeTrigger" && prompt.sourceCardId
+    ? prompt.sourceCardId
+    : undefined;
+}

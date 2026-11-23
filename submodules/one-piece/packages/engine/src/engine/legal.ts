@@ -1,5 +1,5 @@
 import { legalAttackTargets } from "../battle.ts";
-import { selectionRulesForPrompt } from "../selection-rules.ts";
+import { revealedCardIdForPrompt, selectionRulesForPrompt } from "../selection-rules.ts";
 import { cardName, effectBlocksForInstance, getCardForInstance, getPlayer } from "../shared.ts";
 import { getOpenCharacterSlots } from "../state.ts";
 import type {
@@ -74,6 +74,10 @@ export function getLegalCommands(
         // OP Practice fork fix (user-approved 2026-11-23): submit-time selection limits.
         ...(selectionRulesForPrompt(state, prompt)
           ? { selectionRules: selectionRulesForPrompt(state, prompt) }
+          : {}),
+        // OP Practice fork fix (user-approved 2026-11-23): the revealed [Trigger] card's id.
+        ...(revealedCardIdForPrompt(prompt)
+          ? { revealedCardId: revealedCardIdForPrompt(prompt) }
           : {}),
       });
     }

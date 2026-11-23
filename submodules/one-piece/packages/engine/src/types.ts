@@ -1939,6 +1939,11 @@ export interface LegalCommandDescriptor {
   options?: PromptOption[];
   /** OP Practice fork fix (user-approved 2026-11-23): see {@link SelectionRules}. */
   selectionRules?: SelectionRules;
+  /**
+   * OP Practice fork fix (user-approved 2026-11-23): for a Life [Trigger] prompt, the card id
+   * of the Life card revealed for its [Trigger] (public once revealed). Absent otherwise.
+   */
+  revealedCardId?: string;
 }
 
 export type OnePieceCardActionInvalidReasonCode =
@@ -2133,6 +2138,11 @@ export interface ProjectedDecision {
   extensions?: Record<string, string | number | boolean | string[] | null>;
   /** OP Practice fork fix (user-approved 2026-11-23): see {@link SelectionRules}. */
   selectionRules?: SelectionRules;
+  /**
+   * OP Practice fork fix (user-approved 2026-11-23): for a Life [Trigger] prompt, the card id
+   * of the Life card revealed for its [Trigger] (public once revealed). Absent otherwise.
+   */
+  revealedCardId?: string;
 }
 
 export interface ProjectedCard {
