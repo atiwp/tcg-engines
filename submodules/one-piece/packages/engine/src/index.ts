@@ -93,6 +93,7 @@ export type {
   GameLogEntry,
   JudgeCommand,
   LegalCommandDescriptor,
+  SelectionRules,
   MatchConfig,
   MatchFinishReason,
   MatchPhase,

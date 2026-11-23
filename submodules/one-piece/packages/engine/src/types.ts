@@ -8,7 +8,25 @@ import type {
   Keyword,
   OPAttribute,
   EffectBlock,
+  TotalConstraint,
 } from "@tcg/op-types";
+
+/**
+ * OP Practice fork fix (user-approved 2026-11-23): the submit-time limits of an effect
+ * multi-select prompt, as the engine validates them, exposed so a client can respect them.
+ * Public prompt metadata only. Absent fields mean no such limit.
+ */
+export interface SelectionRules {
+  /** The selected cards must all have different card names. */
+  differentNames?: true;
+  /** The selected cards' summed property must satisfy this comparison. */
+  totalConstraint?: TotalConstraint;
+  /**
+   * Grouped play ("up to 1 A and up to 1 B"): each selected card must fill a different group,
+   * taken from that group's `candidateIds` (a subset of the prompt's listed candidates).
+   */
+  groups?: Array<{ candidateIds: string[] }>;
+}
 
 export interface ReplacementSelection {
   id: string;
@@ -1919,6 +1937,8 @@ export interface LegalCommandDescriptor {
   slotChoices?: number[];
   promptId?: string;
   options?: PromptOption[];
+  /** OP Practice fork fix (user-approved 2026-11-23): see {@link SelectionRules}. */
+  selectionRules?: SelectionRules;
 }
 
 export type OnePieceCardActionInvalidReasonCode =
@@ -2111,6 +2131,8 @@ export interface ProjectedDecision {
   validation?: ProjectedDecisionValidationSummary;
   submit: ProjectedDecisionSubmitSpec;
   extensions?: Record<string, string | number | boolean | string[] | null>;
+  /** OP Practice fork fix (user-approved 2026-11-23): see {@link SelectionRules}. */
+  selectionRules?: SelectionRules;
 }
 
 export interface ProjectedCard {

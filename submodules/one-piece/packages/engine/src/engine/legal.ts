@@ -1,4 +1,5 @@
 import { legalAttackTargets } from "../battle.ts";
+import { selectionRulesForPrompt } from "../selection-rules.ts";
 import { cardName, effectBlocksForInstance, getCardForInstance, getPlayer } from "../shared.ts";
 import { getOpenCharacterSlots } from "../state.ts";
 import type {
@@ -36,6 +37,10 @@ export function getLegalCommands(
         label: `Resolve ${prompt.label}`,
         promptId: prompt.id,
         options: prompt.options,
+        // OP Practice fork fix (user-approved 2026-11-23): submit-time selection limits.
+        ...(selectionRulesForPrompt(state, prompt)
+          ? { selectionRules: selectionRulesForPrompt(state, prompt) }
+          : {}),
       });
     }
     legal.push({
@@ -66,6 +71,10 @@ export function getLegalCommands(
         label: prompt.label,
         promptId: prompt.id,
         options: prompt.options,
+        // OP Practice fork fix (user-approved 2026-11-23): submit-time selection limits.
+        ...(selectionRulesForPrompt(state, prompt)
+          ? { selectionRules: selectionRulesForPrompt(state, prompt) }
+          : {}),
       });
     }
   }
