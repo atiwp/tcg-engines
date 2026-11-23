@@ -1023,3 +1023,511 @@ describe("OP18-118 Monkey.D.Luffy", () => {
     expect(south(e).characters.find((c) => c?.cardId === "OP18-035")?.rested).toBe(false);
   });
 });
+
+/** Keep a search's remainder in the offered order. */
+function keepOrder(
+  e: Engine,
+  intent: "effectSearchRemainderOrder" | "effectRearrangeDeckOrder",
+): void {
+  if (!pending(e, "south", intent)) return;
+  const step = e.pendingDecision(intent, "south").steps[0];
+  if (step?.kind !== "orderItems") throw new Error("Expected an order.");
+  e.resolveDecision(intent, { selectedIds: step.candidates.map((c) => c.ref.id) }, "south");
+}
+
+describe("OP18-041 Ms. All Sunday (Leader)", () => {
+  test("a Baroque Works Character with 3000+ base power K.O.'d: draw 1, opponent trashes 1", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        leaderCardId: "OP18-041",
+        character: [{ card: { id: "OP18-044" }, rested: true }],
+        deck: 3,
+      },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }], hand: 2 },
+      { activeSeat: "north" },
+    );
+    northKos(e, "OP18-044");
+    if (pending(e, "north", "effectTrashFromHandSelection")) {
+      e.resolveDecision(
+        "effectTrashFromHandSelection",
+        { selectedIds: [e.getState().players.north.hand[0]!] },
+        "north",
+      );
+    }
+    expect(south(e).hand).toHaveLength(1);
+    expect(north(e).handCount).toBe(1);
+  });
+
+  test("a non-Baroque Works Character K.O.'d does nothing", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        leaderCardId: "OP18-041",
+        character: [{ card: { id: "EB01-018" }, rested: true }],
+        deck: 3,
+      },
+      { character: [{ card: { id: "EB01-041" }, playedOnTurn: 0 }], hand: 2 },
+      { activeSeat: "north" },
+    );
+    northKos(e, "EB01-018");
+    expect(south(e).deckCount).toBe(3);
+    expect(north(e).handCount).toBe(2);
+  });
+});
+
+describe("OP18-042 Hack", () => {
+  test("Activate: Main once per turn: give a rested DON!! to a Dressrosa Leader or Character", () => {
+    const e = OnePieceTestEngine.create({ character: ["OP18-042", "EB05-018"], restedDon: 2 }, {});
+    e.activateMain("OP18-042", "south");
+    e.chooseAmount(1, "south");
+    const rebecca = e.findCardInZone("south", "character", "EB05-018");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [rebecca] }, "south");
+    expect(e.getState().cards[rebecca]?.attachedDon).toBe(1);
+  });
+
+  test("On K.O. draws 1", () => {
+    const e = OnePieceTestEngine.create(
+      { character: [{ card: { id: "OP18-042" }, rested: true }], deck: 3 },
+      attacker8000,
+      { activeSeat: "north" },
+    );
+    northKos(e, "OP18-042");
+    expect(south(e).hand).toHaveLength(1);
+  });
+});
+
+describe("OP18-043 Accelegator (no text on the official card list: vanilla)", () => {
+  test("plays as a 4-cost 6000-power Character with no prompt", () => {
+    const e = OnePieceTestEngine.create({ hand: ["OP18-043"], activeDon: 4 }, {});
+    e.playCard("OP18-043", "south");
+    expect(powerOf(e, "south", "OP18-043")).toBe(6000);
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("OP18-044 Mr.Beans & Miss.Katherina", () => {
+  test("DON!! x1: +1000; On Play: draw 1 and trash 1", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-044", "EB01-005"], deck: 3, activeDon: 4 },
+      {},
+    );
+    e.playCard("OP18-044", "south");
+    const hand = e.getState().players.south.hand;
+    e.resolveDecision("effectTrashFromHandSelection", { selectedIds: [hand[0]!] }, "south");
+    expect(south(e).hand).toHaveLength(1);
+    const beans = e.findCardInZone("south", "character", "OP18-044");
+    e.attachDon(beans, 1, "south");
+    expect(powerOf(e, "south", "OP18-044")).toBe(6000);
+  });
+});
+
+describe("OP18-045 Mr.Prince", () => {
+  test("is also named [Sanji] and gains +1000 per 5 Events in trash", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        character: ["OP18-045"],
+        trash: Array.from({ length: 10 }, () => "OP18-018"),
+      },
+      {},
+    );
+    expect(powerOf(e, "south", "OP18-045")).toBe(6000);
+    const f = OnePieceTestEngine.create({ character: ["OP18-045"], trash: ["OP18-018"] }, {});
+    expect(powerOf(f, "south", "OP18-045")).toBe(4000);
+    // Name check: OP12-071 Charlotte Pudding searches for a [Sanji]; Mr.Prince may be taken.
+    const g = OnePieceTestEngine.create(
+      {
+        hand: ["OP12-071"],
+        deck: ["OP18-045", "EB01-005", "OP01-012", "EB01-018", "EB01-005"],
+        activeDon: 5,
+      },
+      {},
+    );
+    g.playCard("OP12-071", "south");
+    g.choose("effectSearchSelection", ["OP18-045"], "south");
+    keepOrder(g, "effectSearchRemainderOrder");
+    expect(ids(south(g).hand)).toEqual(["OP18-045"]);
+  });
+});
+
+describe("OP18-046 Mr.0 & Ms. All Sunday", () => {
+  test("On Play: draw 2 and give the Leader and each Character up to 2 rested DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-046"], character: ["EB01-005"], deck: 4, activeDon: 9, restedDon: 6 },
+      {},
+    );
+    e.playCard("OP18-046", "south");
+    // The count is asked once per recipient (Leader, then each Character).
+    for (let i = 0; i < 4 && pending(e, "south", "effectGiveDonEachCount"); i += 1) {
+      e.resolveDecision("effectGiveDonEachCount", { optionId: "2" }, "south");
+    }
+    expect(south(e).hand).toHaveLength(2);
+    expect(e.getState().cards[e.leader("south")]?.attachedDon).toBe(2);
+    expect(
+      e.getState().cards[e.findCardInZone("south", "character", "EB01-005")]?.attachedDon,
+    ).toBe(2);
+  });
+
+  test("On Your Opponent's Attack: trash 1: a Baroque Works Leader's base power becomes 7000; declining keeps it", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { leaderCardId: "OP18-041", character: ["OP18-046"], hand: ["EB01-005"] },
+        { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    e.declareAttack(e.findCardInZone("north", "character", "EB01-018"), e.leader("south"), "north");
+    e.accept("south");
+    expect(south(e).leader?.power).toBe(7000);
+    const d = make();
+    d.declareAttack(d.findCardInZone("north", "character", "EB01-018"), d.leader("south"), "north");
+    d.decline("south");
+    expect(south(d).leader?.power).toBe(5000);
+    expect(ids(south(d).hand)).toEqual(["EB01-005"]);
+  });
+});
+
+describe("OP18-047 Mr.1(Daz.Bonez)", () => {
+  test("On Play: a Cross Guild or Baroque Works Leader gains [Unblockable] this turn", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-041", hand: ["OP18-047"], activeDon: 2 },
+      {},
+    );
+    e.playCard("OP18-047", "south");
+    expect(hasGranted(e, e.leader("south"), "unblockable")).toBe(true);
+  });
+
+  test("another Leader gains nothing", () => {
+    const e = OnePieceTestEngine.create({ hand: ["OP18-047"], activeDon: 2 }, {});
+    e.playCard("OP18-047", "south");
+    expect(hasGranted(e, e.leader("south"), "unblockable")).toBe(false);
+  });
+});
+
+describe("OP18-048 Mr.1 & Miss Doublefinger", () => {
+  test("[Rush]; On Play: play a Baroque Works Character with cost 5 or less from hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-048", "OP18-044", "EB01-005"], activeDon: 6 },
+      {},
+    );
+    e.playCard("OP18-048", "south");
+    expect(candidates(e, "effectPlaySelection")).toEqual(["OP18-044"]);
+    e.choose("effectPlaySelection", ["OP18-044"], "south");
+    expect(ids(south(e).characters)).toEqual(expect.arrayContaining(["OP18-048", "OP18-044"]));
+  });
+});
+
+describe("OP18-049 Mr.2.Bon.Kurei(Bentham)", () => {
+  test("On Play: top 5, a Baroque Works card to hand; then give a rested DON!!", () => {
+    const e = OnePieceTestEngine.create(
+      {
+        hand: ["OP18-049"],
+        deck: ["OP18-044", "EB01-005", "OP01-012", "EB01-018", "EB01-005", "EB01-005"],
+        activeDon: 5,
+        restedDon: 2,
+      },
+      {},
+    );
+    e.playCard("OP18-049", "south");
+    expect(() => e.choose("effectSearchSelection", ["EB01-018"], "south")).toThrow();
+    e.choose("effectSearchSelection", ["OP18-044"], "south");
+    keepOrder(e, "effectSearchRemainderOrder");
+    e.chooseAmount(1, "south");
+    e.resolveDecision("effectTargetSelection", { selectedIds: [e.leader("south")] }, "south");
+    expect(ids(south(e).hand)).toEqual(["OP18-044"]);
+    expect(e.getState().cards[e.leader("south")]?.attachedDon).toBe(1);
+  });
+});
+
+describe("OP18-050 Mr.3 & Miss.Goldenweek", () => {
+  test("[Blocker]; On Play with a Baroque Works Leader: a cost 7 or less Character cannot attack", () => {
+    const e = OnePieceTestEngine.create(
+      { leaderCardId: "OP18-041", hand: ["OP18-050"], activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-050", "south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    e.endTurn("south");
+    expect(
+      e.expectFailure({
+        type: "declareAttack",
+        seat: "north",
+        attackerId: e.findCardInZone("north", "character", "EB01-018"),
+        targetId: e.leader("south"),
+      }).accepted,
+    ).toBe(false);
+  });
+
+  test("without a Baroque Works Leader nothing happens", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-050"], activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-050", "south");
+    expect(e.getView("south").prompts).toHaveLength(0);
+  });
+});
+
+describe("OP18-051 Mr.4 & Miss.MerryChristmas", () => {
+  test("On Play: rest 5 DON!!: bottom a cost ≤6 and a cost ≤5 Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-051"], activeDon: 7 },
+      { character: ["EB01-018", "EB01-005", "EB01-055"] },
+    );
+    e.playCard("OP18-051", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    e.choose("effectTargetSelection", ["EB01-005"], "south");
+    // The owner orders its cards for the bottom of the deck.
+    const order = e.pendingDecision("effectReturnToDeckOwnerOrder", "north").steps[0];
+    if (order?.kind !== "orderItems") throw new Error("Expected the owner's order.");
+    e.resolveDecision(
+      "effectReturnToDeckOwnerOrder",
+      { selectedIds: order.candidates.map((c) => c.ref.id) },
+      "north",
+    );
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-055"]);
+    expect(south(e).restedDon).toBe(7);
+  });
+
+  test("declining keeps the DON!! active", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-051"], activeDon: 7 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-051", "south");
+    e.decline("south");
+    expect(south(e).activeDon).toBe(5);
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-018"]);
+  });
+});
+
+describe("OP18-052 Mr.5 & Miss.Valentine", () => {
+  test("On Play: play a Baroque Works Character with cost 3 or less from hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-052", "OP18-044", "OP18-048"], activeDon: 5 },
+      {},
+    );
+    e.playCard("OP18-052", "south");
+    expect(candidates(e, "effectPlaySelection")).toEqual(["OP18-044"]);
+    e.choose("effectPlaySelection", ["OP18-044"], "south");
+    expect(ids(south(e).characters)).toContain("OP18-044");
+  });
+});
+
+describe("OP18-053 Mr.7 & Miss.Father'sDay", () => {
+  test("On Play: look at the top 3 and put them back in any order on top or bottom", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-053"], deck: ["EB01-005", "OP01-012", "EB01-018", "EB01-055"], activeDon: 2 },
+      {},
+    );
+    e.playCard("OP18-053", "south");
+    const step = e.pendingDecision("effectRearrangeDeckOrder", "south").steps[0];
+    if (step?.kind !== "orderItems") throw new Error("Expected an order.");
+    e.resolveDecision(
+      "effectRearrangeDeckOrder",
+      { selectedIds: [...step.candidates].reverse().map((c) => c.ref.id) },
+      "south",
+    );
+    const position = e
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south");
+    if (position) {
+      e.exec({
+        type: "resolvePrompt",
+        seat: "south",
+        promptId: position.id,
+        optionId: position.options.at(-1)!.id,
+      });
+    }
+    expect(south(e).deckCount).toBe(4);
+  });
+});
+
+describe("OP18-054 Mr.8 & Ms. Monday", () => {
+  test("Opponent's Turn: a Baroque Works Character removed by an opponent's effect: trash 1 instead", () => {
+    const make = () =>
+      OnePieceTestEngine.create(
+        { character: ["OP18-054", "OP18-044"], hand: ["EB01-005"] },
+        { hand: ["EB05-029", "OP01-012"], activeDon: 6 },
+        { activeSeat: "north" },
+      );
+    const e = make();
+    e.playCard("EB05-029", "north");
+    e.accept("north");
+    e.choose(
+      "effectTargetSelection",
+      [e.findCardInZone("south", "character", "OP18-044")],
+      "north",
+    );
+    const intent = e
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south")
+      ?.resolutionContext?.intent;
+    e.resolveDecision(intent as never, { optionId: "yes" }, "south");
+    expect(ids(south(e).characters)).toContain("OP18-044");
+    expect(ids(south(e).trash)).toEqual(["EB01-005"]);
+
+    const d = make();
+    d.playCard("EB05-029", "north");
+    d.accept("north");
+    d.choose(
+      "effectTargetSelection",
+      [d.findCardInZone("south", "character", "OP18-044")],
+      "north",
+    );
+    const intent2 = d
+      .getState()
+      .promptQueue.find((p) => p.status === "pending" && p.seat === "south")
+      ?.resolutionContext?.intent;
+    d.resolveDecision(intent2 as never, { optionId: "no" }, "south");
+    expect(ids(south(d).hand)).toEqual(expect.arrayContaining(["EB01-005", "OP18-044"]));
+  });
+});
+
+describe("OP18-055 Mr.9 & Ms. Wednesday", () => {
+  test("On Play: return an opposing cost 2 or less Character to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-055"], activeDon: 3 },
+      { character: ["EB01-005", "EB01-018"] },
+    );
+    e.playCard("OP18-055", "south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["EB01-005"]);
+    e.choose("effectTargetSelection", ["EB01-005"], "south");
+    expect(north(e).handCount).toBe(1);
+  });
+});
+
+describe("OP18-056 Mr.13 & Ms.Friday", () => {
+  test("On Play: bottom another Baroque Works Character: opponent trashes 1", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-056"], character: ["OP18-044"], activeDon: 2 },
+      { hand: 2 },
+    );
+    e.playCard("OP18-056", "south");
+    e.accept("south");
+    e.resolveDecision(
+      "effectTrashFromHandSelection",
+      { selectedIds: [e.getState().players.north.hand[0]!] },
+      "north",
+    );
+    expect(north(e).handCount).toBe(1);
+    expect(ids(south(e).characters).filter(Boolean)).toEqual(["OP18-056"]);
+  });
+
+  test("declining keeps the Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-056"], character: ["OP18-044"], activeDon: 2 },
+      { hand: 2 },
+    );
+    e.playCard("OP18-056", "south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP18-044");
+    expect(north(e).handCount).toBe(2);
+  });
+});
+
+describe("OP18-057 Atomic Dicer", () => {
+  test("Main: rest 3 DON!!: return a cost 5 or less Character to hand", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-057"], activeDon: 4 },
+      { character: ["EB01-018", "EB01-055"] },
+    );
+    e.playCard("OP18-057", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(north(e).handCount).toBe(1);
+  });
+
+  test("declining keeps the DON!!; Counter: the Leader +3000", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-057"], activeDon: 4 },
+      { character: ["EB01-018"] },
+    );
+    e.playCard("OP18-057", "south");
+    e.decline("south");
+    expect(south(e).activeDon).toBe(3);
+    const f = OnePieceTestEngine.create(
+      { hand: ["OP18-057"], activeDon: 1 },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(f).lifeCount;
+    f.declareAttack(f.findCardInZone("north", "character", "EB01-018"), f.leader("south"), "north");
+    f.resolveDecision(
+      "battleCounter",
+      { selectedIds: [f.findCardInZone("south", "hand", "OP18-057")] },
+      "south",
+    );
+    expect(south(f).lifeCount).toBe(life);
+  });
+});
+
+describe("OP18-058 This Kingdom is Doomed. You Can't Save It!", () => {
+  test("Main: return one of your Characters to hand: bottom a cost 4 or less Character", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-058"], character: ["OP18-044"], activeDon: 3 },
+      { character: ["EB01-018", "OP01-012"] },
+    );
+    e.playCard("OP18-058", "south");
+    e.accept("south");
+    expect(candidates(e, "effectTargetSelection")).toEqual(["OP01-012"]);
+    e.choose("effectTargetSelection", ["OP01-012"], "south");
+    expect(ids(south(e).hand)).toEqual(["OP18-044"]);
+    expect(ids(north(e).characters).filter(Boolean)).toEqual(["EB01-018"]);
+  });
+
+  test("declining keeps your Character; Trigger activates the Main effect", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-058"], character: ["OP18-044"], activeDon: 3 },
+      { character: ["OP01-012"] },
+    );
+    e.playCard("OP18-058", "south");
+    e.decline("south");
+    expect(ids(south(e).characters)).toContain("OP18-044");
+    const f = OnePieceTestEngine.create(
+      { life: ["OP18-058", "EB01-005"], character: ["OP18-044"] },
+      { character: ["OP01-012"] },
+      { activeSeat: "north" },
+    );
+    f.declareAttack(f.leader("north"), f.leader("south"), "north");
+    f.resolveDecision("lifeTrigger", { optionId: "activate" }, "south");
+    expect(pending(f, "south", "effectOptional")).toBe(true);
+  });
+});
+
+describe("OP18-059 I Pray For Your Success.", () => {
+  test("Main: rest 1 DON!! and trash a Baroque Works card: draw 2", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-059", "OP18-044"], deck: 3, activeDon: 1 },
+      {},
+    );
+    e.playCard("OP18-059", "south");
+    e.accept("south");
+    expect(south(e).hand).toHaveLength(2);
+    expect(ids(south(e).trash)).toEqual(expect.arrayContaining(["OP18-044", "OP18-059"]));
+  });
+
+  test("declining keeps the hand; Counter: trash 1: +3000", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["OP18-059", "OP18-044"], deck: 3, activeDon: 1 },
+      {},
+    );
+    e.playCard("OP18-059", "south");
+    e.decline("south");
+    expect(ids(south(e).hand)).toEqual(["OP18-044"]);
+    const f = OnePieceTestEngine.create(
+      { hand: ["OP18-059", "EB01-005"] },
+      { character: [{ card: { id: "EB01-018" }, playedOnTurn: 0 }] },
+      { activeSeat: "north" },
+    );
+    const life = south(f).lifeCount;
+    f.declareAttack(f.findCardInZone("north", "character", "EB01-018"), f.leader("south"), "north");
+    f.resolveDecision(
+      "battleCounter",
+      { selectedIds: [f.findCardInZone("south", "hand", "OP18-059")] },
+      "south",
+    );
+    f.accept("south");
+    f.resolveDecision("effectTargetSelection", { selectedIds: [f.leader("south")] }, "south");
+    expect(south(f).lifeCount).toBe(life);
+  });
+});
