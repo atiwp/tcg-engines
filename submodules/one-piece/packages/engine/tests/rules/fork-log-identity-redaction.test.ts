@@ -4,6 +4,11 @@
 import { getCard } from "@tcg/op-cards";
 import { describe, expect, test } from "vite-plus/test";
 import { OnePieceTestEngine } from "../../src/index.ts";
+import { runBotMatch } from "../../src/automation/bot-harness.ts";
+import { heuristicAgent } from "../../src/automation/heuristic-strategy.ts";
+import { TEST_DECKS, type TestDeckId } from "../../src/automation/test-decks.ts";
+import { projectStateForSeat } from "../../src/projection.ts";
+import type { MatchConfig, MatchState } from "../../src/types.ts";
 
 type Engine = OnePieceTestEngine;
 type Seat = "south" | "north";
@@ -96,4 +101,87 @@ describe("log identities in the player view (fork fix)", () => {
       expect(e.getView(seat).logs.some((log) => log.sourceInstanceId === attacker)).toBe(true);
     }
   });
+
+  test("a public move to hand keeps its ids for both seats, even after the card's identity is rotated", () => {
+    const e = OnePieceTestEngine.create(
+      { hand: ["EB05-029", "EB01-005"], activeDon: 5 },
+      { character: ["EB01-018"] },
+    );
+    const bounced = e.findCardInZone("north", "character", "EB01-018");
+    e.playCard("EB05-029", "south");
+    e.accept("south");
+    e.choose("effectTargetSelection", ["EB01-018"], "south");
+    expect(e.getState().cards[bounced]?.zone).toBe("hand");
+    const naming = (state: MatchState, seat: Seat) =>
+      projectStateForSeat(state, seat).logs.filter(
+        (log) => log.sourceInstanceId === bounced || log.targetIds.includes(bounced),
+      );
+    for (const seat of ["south", "north"] as const) {
+      expect(naming(e.getState(), seat).length).toBeGreaterThan(0);
+    }
+    // The card is now hidden in North's hand: give it another identity; nothing changes.
+    const rotated = structuredClone(e.getState());
+    rotated.cards[bounced]!.cardId = "OP01-012";
+    for (const seat of ["south", "north"] as const) {
+      expect(projectStateForSeat(rotated, seat).logs).toEqual(
+        projectStateForSeat(e.getState(), seat).logs,
+      );
+    }
+  });
+
+  test("rotating the identities of hidden cards never changes any projected log field", () => {
+    const decks = Object.keys(TEST_DECKS) as TestDeckId[];
+    let rotatedNamed = 0;
+    for (let g = 0; g < 4; g += 1) {
+      const south = TEST_DECKS[decks[g % decks.length]!];
+      const north = TEST_DECKS[decks[(g + 1) % decks.length]!];
+      const config: MatchConfig = {
+        firstPlayer: g % 2 === 0 ? "south" : "north",
+        seed: 7000 + g,
+        shuffleDecks: true,
+        openingHandSize: 5,
+        skipFirstTurnDraw: true,
+        maxCharacterSlots: 5,
+        players: {
+          south: {
+            leaderCardId: south.leaderId,
+            mainDeck: [...south.mainDeck],
+            playerName: "South",
+          },
+          north: {
+            leaderCardId: north.leaderId,
+            mainDeck: [...north.mainDeck],
+            playerName: "North",
+          },
+        },
+      };
+      const { finalState } = runBotMatch(
+        config,
+        { south: heuristicAgent, north: heuristicAgent },
+        { maxCommands: 300, seed: 7000 + g },
+      );
+      for (const viewer of ["south", "north"] as const) {
+        const other = viewer === "south" ? "north" : "south";
+        const p = finalState.players[other];
+        // Cards hidden from the viewer now: the other player's hand, deck and face-down Life.
+        const hidden = [...p.hand, ...p.deck, ...p.life].filter(
+          (id) => !finalState.cards[id]!.publicKnowledge,
+        );
+        const inLogs = new Set(
+          finalState.logHistory.flatMap((log) => [log.sourceInstanceId, ...log.targetIds]),
+        );
+        rotatedNamed += hidden.filter((id) => inLogs.has(id)).length;
+        // Rotate the card codes among the hidden cards (a different, equally possible world).
+        const rotated = structuredClone(finalState);
+        hidden.forEach((id, k) => {
+          rotated.cards[id]!.cardId = finalState.cards[hidden[(k + 1) % hidden.length]!]!.cardId;
+        });
+        expect(projectStateForSeat(rotated, viewer).logs, `game ${g} ${viewer}`).toEqual(
+          projectStateForSeat(finalState, viewer).logs,
+        );
+      }
+    }
+    // The check bites: some rotated hidden cards are named by log entries.
+    expect(rotatedNamed).toBeGreaterThan(0);
+  }, 60_000);
 });

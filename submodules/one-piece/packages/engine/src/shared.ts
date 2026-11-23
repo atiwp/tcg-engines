@@ -287,21 +287,34 @@ export function emitLog(
     privateMessages: payload.privateMessages ?? {},
     judgeMessage: payload.judgeMessage ?? null,
   };
-  // OP Practice fork fix (user-approved 2026-11-23): record who could see each named card now
-  // (same rule as the player view's card projection), so later views do not leak hidden cards.
-  const identityVisibleTo: Record<string, MatchSeat[]> = {};
+  // OP Practice fork fix (user-approved 2026-11-23): decide now, once, who may see each named
+  // card's identity in this entry: the viewers who can see the card at this moment (same rule as
+  // the player view's card projection) or whose own message for this entry names it.
+  const viewers = ["south", "north", "spectator"] as const;
+  const messageFor = (viewer: (typeof viewers)[number]) =>
+    viewer === "spectator" ? entry.message : (entry.privateMessages[viewer] ?? entry.message);
+  const names = (viewer: (typeof viewers)[number], cardId: string) =>
+    messageFor(viewer).includes(getCard(cardId).i18n.en.name);
+  const identityVisibleTo: Record<string, (typeof viewers)[number][]> = {};
   for (const id of [entry.sourceInstanceId, ...entry.targetIds]) {
     const instance = id ? state.cards[id] : undefined;
     if (!id || !instance) continue;
-    identityVisibleTo[id] = (["south", "north"] as const).filter(
-      (seat) =>
+    identityVisibleTo[id] = viewers.filter(
+      (viewer) =>
         instance.publicKnowledge ||
         instance.zone === "leader" ||
         instance.zone === "character" ||
-        (instance.zone === "hand" && instance.controller === seat),
+        (instance.zone === "hand" && instance.controller === viewer) ||
+        names(viewer, instance.cardId),
     );
   }
   entry.identityVisibleTo = identityVisibleTo;
+  entry.sourceCardVisibleTo =
+    entry.sourceInstanceId && identityVisibleTo[entry.sourceInstanceId]
+      ? identityVisibleTo[entry.sourceInstanceId]
+      : entry.sourceCardId
+        ? viewers.filter((viewer) => names(viewer, entry.sourceCardId!))
+        : [...viewers];
   state.logHistory.push(entry);
   return entry;
 }

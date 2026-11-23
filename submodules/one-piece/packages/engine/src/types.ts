@@ -1671,6 +1671,9 @@ export interface EngineAnimation {
   group?: string;
 }
 
+/** OP Practice fork fix (user-approved 2026-11-23): who may see a log entry's card identities. */
+export type LogIdentityViewer = MatchSeat | "spectator";
+
 export interface GameLogEntry {
   id: string;
   turn: number;
@@ -1686,11 +1689,13 @@ export interface GameLogEntry {
   privateMessages: Partial<Record<MatchSeat, string>>;
   judgeMessage: string | null;
   /**
-   * OP Practice fork fix (user-approved 2026-11-23): for each card instance the entry names, the
-   * seats that could see that card when the entry was logged. The player view uses it to keep
-   * hidden identities out of the other seat's logs.
+   * OP Practice fork fix (user-approved 2026-11-23): decided once, when the entry is logged. For
+   * each card instance the entry names, the viewers that may see that card's identity in it; and
+   * the same for `sourceCardId`. The player view reads only these, never the current state, so a
+   * hidden card's later identity or position cannot change a projected log line.
    */
-  identityVisibleTo?: Record<string, MatchSeat[]>;
+  identityVisibleTo?: Record<string, LogIdentityViewer[]>;
+  sourceCardVisibleTo?: LogIdentityViewer[];
 }
 
 export interface DelayedEffectAction {
