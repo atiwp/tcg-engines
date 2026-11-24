@@ -7,6 +7,7 @@ import {
   cardMatchesTrait,
   donCardsOnField,
   effectBlocksFor,
+  effectsAreNegated,
   getCardAttribute,
   getCardCost,
   getCardPower,
@@ -144,9 +145,15 @@ export function matchesTargetFilter(
     case "hasKeyword":
       return { supported: true, matches: getKeywords(state, candidateId).has(filter.value) };
     case "hasTrigger": {
+      // OP Practice fork fix 8 (official Q&A OP17-112 / OP17-105): a card in play whose effects are
+      // negated is no longer treated as having a [Trigger].
       const hasTrigger =
         (card.cardType === "event" || card.cardType === "stage" || card.cardType === "character") &&
-        (Boolean(card.trigger) || effectBlocksFor(card, "trigger").length > 0);
+        (Boolean(card.trigger) || effectBlocksFor(card, "trigger").length > 0) &&
+        !(
+          ["leader", "character", "stage"].includes(candidate.zone) &&
+          effectsAreNegated(state, candidateId, "trigger")
+        );
       return {
         supported: true,
         matches: filter.value ? hasTrigger : !hasTrigger,
