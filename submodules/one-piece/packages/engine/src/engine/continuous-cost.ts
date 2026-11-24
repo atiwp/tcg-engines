@@ -1,3 +1,4 @@
+import { current, isDraft, type Draft } from "immer";
 import { orderedPowerDependencies, numericTargetScope } from "./continuous-numeric-dependencies.ts";
 import { getCard } from "../../../cards/src/runtime-catalog.ts";
 import {
@@ -24,19 +25,82 @@ import type { ContinuousCostProcess, MatchSeat, MatchState } from "../types.ts";
 // command bookkeeping must not reset a player's saved choice. K.O. history is
 // the sole history input read by those evaluators; retain the full event facts.
 const immutableInputs = new WeakMap<MatchState, string>();
+
+// OP Practice fork fix 7 (speed only, see FORK-CHANGES.md): the fingerprint string is unchanged,
+// but it is built from an Immer snapshot (`current`, which hands back the original frozen objects
+// for every unmodified subtree) and a JSON cache keyed on deep-frozen objects, instead of
+// JSON-stringifying the whole draft through Immer's proxies on every read.
+const frozenJson = new WeakMap<object, string>();
+const plainPrototypes = new Set<unknown>([Object.prototype, null, Array.prototype]);
+
+/** Exactly `JSON.stringify(value)` for the JSON data the match state holds. */
+function stableJson(value: unknown): string | undefined {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  const cached = frozenJson.get(value);
+  if (cached !== undefined) return cached;
+  if (
+    !plainPrototypes.has(Object.getPrototypeOf(value)) ||
+    typeof (value as { toJSON?: unknown }).toJSON === "function"
+  )
+    return JSON.stringify(value);
+  let deepFrozen = Object.isFrozen(value);
+  const encode = (child: unknown): string | undefined => {
+    const encoded = stableJson(child);
+    if (deepFrozen && child !== null && typeof child === "object" && !frozenJson.has(child))
+      deepFrozen = false;
+    return encoded;
+  };
+  let json: string;
+  if (Array.isArray(value)) {
+    const parts: string[] = [];
+    for (let index = 0; index < value.length; index++) parts.push(encode(value[index]) ?? "null");
+    json = `[${parts.join(",")}]`;
+  } else {
+    const parts: string[] = [];
+    for (const key of Object.keys(value)) {
+      const encoded = encode((value as Record<string, unknown>)[key]);
+      if (encoded !== undefined) parts.push(`${JSON.stringify(key)}:${encoded}`);
+    }
+    json = `{${parts.join(",")}}`;
+  }
+  if (deepFrozen) frozenJson.set(value, json);
+  return json;
+}
+
+const snapshot = <T>(value: T): T => (isDraft(value) ? (current(value as Draft<T>) as T) : value);
+
+// Read-only snapshots taken for one settlement: nothing writes to them while the ordering model
+// runs, so their fingerprint is computed once.
+const readOnlySnapshots = new WeakMap<MatchState, string | undefined>();
+function readOnlyView(state: MatchState): MatchState {
+  if (!isDraft(state)) return state;
+  const view = current(state);
+  readOnlySnapshots.set(view, undefined);
+  return view;
+}
+
 export function continuousCostFingerprint(state: MatchState): string {
+  if (readOnlySnapshots.has(state)) {
+    const known = readOnlySnapshots.get(state);
+    if (known !== undefined) return known;
+    readOnlySnapshots.delete(state);
+    const fingerprint = continuousCostFingerprint(state);
+    readOnlySnapshots.set(state, fingerprint);
+    return fingerprint;
+  }
   let inputs = immutableInputs.get(state);
+  const cards = snapshot(state.cards);
   if (inputs === undefined)
-    inputs = JSON.stringify({
-      cards: state.cards,
-      players: state.players,
-      modifiers: state.modifiers,
+    inputs = stableJson({
+      cards,
+      players: snapshot(state.players),
+      modifiers: snapshot(state.modifiers),
       activeSeat: state.activeSeat,
       turnNumber: state.turnNumber,
       phase: state.phase,
-      battle: state.battle,
-      koHistory: state.eventHistory.filter((event) => event.type === "characterKod"),
-    });
+      battle: snapshot(state.battle),
+      koHistory: snapshot(state.eventHistory).filter((event) => event.type === "characterKod"),
+    })!;
   // Immer's published states are immutable; drafts and raw restored snapshots
   // are never cached. Card definitions are checked separately on every read.
   if (
@@ -49,10 +113,10 @@ export function continuousCostFingerprint(state: MatchState): string {
     immutableInputs.set(state, inputs);
   return (
     inputs +
-    JSON.stringify(
+    stableJson(
       [
         ...new Set(
-          Object.values(state.cards)
+          Object.values(cards)
             .filter((card) => ["leader", "character", "stage", "hand"].includes(card.zone))
             .map((card) => card.cardId),
         ),
@@ -248,6 +312,34 @@ function costModel(state: MatchState) {
       for (const id of Object.keys(result)) result[id] = fixedBases[id]! + additions[id]!;
     return result;
   };
+  // Fork fix 7 (speed only): these are pure in the node's numbers once `fixedBases` is set by the
+  // first `powers` call, and their callers only read the results, so equal nodes share one result.
+  // Internal callers that mutate a result (`values` on `baseCosts`, `powers` on `basePowers`) keep
+  // calling the uncached functions above.
+  const nodeKey = (node: ContinuousCostProcess) =>
+    JSON.stringify([
+      node.stage,
+      node.contributions,
+      node.powerContributions ?? null,
+      node.baseCostContributions ?? null,
+      node.basePowerContributions ?? null,
+    ]);
+  const memoized = (compute: (node: ContinuousCostProcess) => Record<string, number>) => {
+    const known = new Map<string, Record<string, number>>();
+    return (node: ContinuousCostProcess): Record<string, number> => {
+      const key = nodeKey(node);
+      let result = known.get(key);
+      if (result === undefined) {
+        result = compute(node);
+        known.set(key, result);
+      }
+      return result;
+    };
+  };
+  const sharedValues = memoized(values);
+  const sharedPowers = memoized(powers);
+  const sharedBaseCosts = memoized(baseCosts);
+  const sharedBasePowers = memoized(basePowers);
   const identities = (seat: MatchSeat) =>
     entries.filter((entry) => entry.source.controller === seat).map((entry) => entry.id);
   const normalize = (
@@ -297,10 +389,10 @@ function costModel(state: MatchState) {
             basePowerContributions,
           };
           return {
-            costs: values(provisional),
-            powers: powers(provisional),
-            baseCosts: baseCosts(provisional),
-            basePowers: legacyBases ? basePowers(provisional) : undefined,
+            costs: sharedValues(provisional),
+            powers: sharedPowers(provisional),
+            baseCosts: sharedBaseCosts(provisional),
+            basePowers: legacyBases ? sharedBasePowers(provisional) : undefined,
           };
         },
       ),
@@ -383,8 +475,8 @@ function costModel(state: MatchState) {
       return new Map([
         [
           JSON.stringify([
-            values(node),
-            powers(node),
+            sharedValues(node),
+            sharedPowers(node),
             node.contributions,
             node.powerContributions,
             node.baseCostContributions,
@@ -505,9 +597,12 @@ export function settleContinuousCosts(state: MatchState): boolean {
   }
   if (state.promptQueue.some((prompt) => prompt.status === "pending" && prompt.seat !== "judge"))
     return false;
-  const powerProfile = orderedPowerDependencies(state);
-  const entries = continuousCostEntries(state, powerProfile.ordered);
-  const hasBaseCostSetting = Object.values(state.cards).some(
+  // Fork fix 7 (speed only): every read below goes to one read-only snapshot of the draft;
+  // writes still go to `state`.
+  const view = readOnlyView(state);
+  const powerProfile = orderedPowerDependencies(view);
+  const entries = continuousCostEntries(view, powerProfile.ordered);
+  const hasBaseCostSetting = Object.values(view.cards).some(
     (source) =>
       ["leader", "character", "stage", "hand"].includes(source.zone) &&
       (getCard(source.cardId).effects?.permanentEffects ?? []).some((effect) =>
@@ -519,16 +614,16 @@ export function settleContinuousCosts(state: MatchState): boolean {
     powerProfile.ordered.size === 0 &&
     (entries.length === 0 ||
       (!entries.some((entry) => hasLiveCostRead(entry.effect) || hasDerivedRead(entry.effect)) &&
-        !hasInPlayNegation(state)))
+        !hasInPlayNegation(view)))
   ) {
     state.continuousCosts = undefined;
     return true;
   }
-  const fingerprint = continuousCostFingerprint(state);
-  if (state.continuousCosts?.fingerprint === fingerprint && !state.continuousCosts.pending)
-    return !state.continuousCosts.unsupported;
-  const prior = state.continuousCosts;
-  const model = costModel(state);
+  const fingerprint = continuousCostFingerprint(view);
+  if (view.continuousCosts?.fingerprint === fingerprint && !view.continuousCosts.pending)
+    return !view.continuousCosts.unsupported;
+  const prior = view.continuousCosts;
+  const model = costModel(view);
   const contributions = Object.fromEntries(
     entries.flatMap((entry) =>
       entry.actions
@@ -704,7 +799,7 @@ export function chooseContinuousCostOrder(
     !saved.pending.remaining.includes(id)
   )
     return false;
-  const model = costModel(state);
+  const model = costModel(readOnlyView(state));
   saved.pending = model.step(saved.pending, id);
   saved.contributions = saved.pending.contributions;
   saved.values = model.values(saved.pending);
