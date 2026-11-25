@@ -60,6 +60,9 @@ export const op02Magellan071: LeaderCard = {
           },
         ],
         oncePerTurn: true,
+        // OP Practice fork fix 9: qa_op02.pdf (OP02-071) rules that the opponent's DON!! card
+        // returned to their DON!! deck also counts.
+        donOwner: "any",
       },
     ],
   },

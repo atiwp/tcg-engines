@@ -39,6 +39,13 @@ export interface EffectBlock {
   optional?: boolean;
   oncePerTurn?: boolean;
   oncePerTurnKey?: string;
+  /**
+   * `whenDonReturned` only: whose returned DON!! card the block reacts to. Default "self" (the
+   * printed "a DON!! card on your field is returned to your DON!! deck"); "any" also reacts to the
+   * opponent's DON!! card returned to their DON!! deck, where an official ruling says so
+   * (OP02-071 Magellan, qa_op02.pdf). OP Practice fork fix 9.
+   */
+  donOwner?: "self" | "any";
 }
 
 export interface PermanentEffect {

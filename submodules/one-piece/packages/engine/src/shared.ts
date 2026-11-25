@@ -392,6 +392,7 @@ export function enqueueEffectsForTrigger(
   trigger: EffectBlock["trigger"],
   trashHandIds: string[] | undefined,
   triggerEvent?: Extract<ResolutionItem, { kind: "effectBlock" }>["triggerEvent"],
+  blockFilter?: (block: EffectBlock) => boolean,
 ) {
   const source = getInstance(state, sourceInstanceId);
   const blocks = effectBlocksForInstance(state, sourceInstanceId, trigger);
@@ -401,6 +402,9 @@ export function enqueueEffectsForTrigger(
   const keysQueuedThisPass = new Set<string>();
 
   for (const [index, block] of blocks.entries()) {
+    if (blockFilter && !blockFilter(block)) {
+      continue;
+    }
     const effectKey = block.oncePerTurnKey ?? `${trigger}:${index}`;
     if (block.oncePerTurn && source.usedEffectKeys.includes(effectKey)) {
       continue;
@@ -432,6 +436,7 @@ export function enqueueInPlayEffectsForTrigger(
   triggerEvent?: Extract<ResolutionItem, { kind: "effectBlock" }>["triggerEvent"],
   sourceControllers?: readonly MatchSeat[],
   excludeInstanceIds?: readonly string[],
+  blockFilter?: (block: EffectBlock) => boolean,
 ) {
   // 8-6-1: when both players' effect timings are fulfilled at the same time,
   // the turn player's effects resolve first.
@@ -459,6 +464,7 @@ export function enqueueInPlayEffectsForTrigger(
         trigger,
         undefined,
         triggerEvent,
+        blockFilter,
       );
     }
   }

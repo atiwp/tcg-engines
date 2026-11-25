@@ -1985,8 +1985,24 @@ export function returnSelectedDonToDeck(
         ? { instanceId: sourceInstanceId, effectController, amount: selectedIds.length }
         : undefined;
     // Printed as "when a DON!! card on your field is returned to your DON!!
-    // deck", so only the returning player's in-play cards react.
-    enqueueInPlayEffectsForTrigger(state, "whenDonReturned", triggerEvent, [seat]);
+    // deck", so the returning player's in-play cards react. OP Practice fork fix 9: a block with
+    // `donOwner: "any"` (OP02-071 Magellan, per qa_op02.pdf) also reacts to the opponent's DON!!;
+    // 8-6-1: the turn player's effects are queued first.
+    const opponent = otherSeat(seat);
+    for (const reacting of state.activeSeat === seat ? [seat, opponent] : [opponent, seat]) {
+      if (reacting === seat) {
+        enqueueInPlayEffectsForTrigger(state, "whenDonReturned", triggerEvent, [seat]);
+      } else {
+        enqueueInPlayEffectsForTrigger(
+          state,
+          "whenDonReturned",
+          triggerEvent,
+          [opponent],
+          undefined,
+          (block) => block.donOwner === "any",
+        );
+      }
+    }
   }
 }
 
