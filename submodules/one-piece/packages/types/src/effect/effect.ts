@@ -46,6 +46,12 @@ export interface EffectBlock {
    * (OP02-071 Magellan, qa_op02.pdf). OP Practice fork fix 9.
    */
   donOwner?: "self" | "any";
+  /**
+   * `onOpponentAttack` only: the block activates after the Block step instead of at the attack
+   * declaration, so it does not activate if a [Blocker] changed the attack's target (OP03-001
+   * Portgas.D.Ace "When this Leader ... is attacked", qa_op03.pdf). OP Practice fork fix 10.
+   */
+  afterBlockStep?: boolean;
 }
 
 export interface PermanentEffect {

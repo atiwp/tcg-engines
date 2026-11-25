@@ -71,6 +71,9 @@ export const op03PortgasDAce001: LeaderCard = {
       {
         trigger: "onOpponentAttack",
         eventFilter: { targetSelf: true },
+        // OP Practice fork fix 10: qa_op03.pdf rules that "is attacked" activates after the Block
+        // step (and not at all if our [Blocker] takes the attack).
+        afterBlockStep: true,
         actions: [
           {
             action: "trashFromHand",

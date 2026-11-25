@@ -15,6 +15,8 @@ import {
   continueEffectDamage,
   continueLeaderDamage,
   endBattleIfParticipantLeftArea,
+  enqueueAfterBlockStepEffects,
+  enqueueDefenderDamageEffects,
   finalizeBattleCleanup,
   finalizeBattle,
   queueBattleLifeTriggerPrompt,
@@ -55,11 +57,13 @@ function queueBattleBlockChoice(state: MatchState, battleId: string) {
 
   const defendingSeat = battle.defendingSeat;
   if (getKeywords(state, battle.attackerId).has("unblockable")) {
+    enqueueAfterBlockStepEffects(state);
     enqueueResolution(state, { kind: "battleCounterStep", battleId });
     return;
   }
   const blockers = blockerCandidates(state, defendingSeat, battle.targetId);
   if (blockers.length === 0) {
+    enqueueAfterBlockStepEffects(state);
     enqueueResolution(state, {
       kind: "battleCounterStep",
       battleId,
@@ -140,15 +144,21 @@ export function drainResolutionQueue(state: MatchState) {
     // An activated block and all its payment/action continuations finish before
     // another auto effect can activate. Freshly fulfilled effects form the next
     // group only after both controllers exhaust the original ready group.
+    // Fork fix 10: a [Trigger] prompt that follows the attacker's "when ... deals damage" effects
+    // lets those effects become ready first.
+    const head = state.resolutionQueue[0];
+    const attackerEffectsFirst =
+      head?.kind === "battleLifeTriggerPrompt" && head.attackerEffectsFirst === true;
     if (
       !state.effectResolving &&
-      ![
-        "effectBlock",
-        "effectAfterCostSettlement",
-        "battleLifeTriggerPrompt",
-        "battleDamageContinue",
-        "effectDamageContinue",
-      ].includes(state.resolutionQueue[0]?.kind ?? "")
+      (attackerEffectsFirst ||
+        ![
+          "effectBlock",
+          "effectAfterCostSettlement",
+          "battleLifeTriggerPrompt",
+          "battleDamageContinue",
+          "effectDamageContinue",
+        ].includes(head?.kind ?? ""))
     ) {
       prepareReadyEffect(state);
       if (hasPendingNonJudgePrompt(state)) {
@@ -360,6 +370,8 @@ export function drainResolutionQueue(state: MatchState) {
             item.lifeCardId,
             item.lifeCountAfterRemoval,
           );
+          // Fork fix 10: the defender's "when you take damage" effects follow the [Trigger].
+          if (item.attackerEffectsFirst) enqueueDefenderDamageEffects(state, state.battle);
         }
         break;
       case "battleDamageComplete":

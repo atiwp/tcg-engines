@@ -1563,6 +1563,12 @@ export type ResolutionItem =
       lifeCountAfterRemoval: number;
       battleId: string;
       lifeCardId: string;
+      /**
+       * OP Practice fork fix 10: the attacker's "when ... deals damage" effects were queued before
+       * this item and activate first; the defender's "when you take damage" effects are queued
+       * when this item is processed, so they follow the [Trigger].
+       */
+      attackerEffectsFirst?: boolean;
     }
   | {
       id: string;

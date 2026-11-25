@@ -9,7 +9,7 @@ import {
 import { OnePieceTestEngine } from "../../../src/index.ts";
 
 describe("OP03-051 Bell-mere", () => {
-  test("with DON!! resolves the exact checked Life Trigger before damage effects", () => {
+  test("with DON!! resolves the damage effect, then the exact checked Life Trigger (qa_op03.pdf, fork fix 10)", () => {
     const engine = OnePieceTestEngine.create(
       {
         character: [{ card: op03BellMere051, playedOnTurn: 0, attachedDon: 1 }],
@@ -29,6 +29,11 @@ describe("OP03-051 Bell-mere", () => {
       faceUp: true,
       publicKnowledge: true,
     });
+    expect(engine.pendingDecision("effectOptional", "south").steps).toHaveLength(1);
+    expect(() => engine.pendingDecision("lifeTrigger", "north")).toThrow(
+      "Could not find a pending lifeTrigger prompt for north.",
+    );
+    engine.resolveDecision("effectOptional", { optionId: "yes" }, "south");
     const lifeTriggerPrompt = engine
       .getState()
       .promptQueue.find(
@@ -37,12 +42,7 @@ describe("OP03-051 Bell-mere", () => {
       );
     expect(lifeTriggerPrompt?.sourceInstanceId).toBe(checkedLifeId);
     expect(engine.pendingDecision("lifeTrigger", "north").steps).toHaveLength(1);
-    expect(() => engine.pendingDecision("effectOptional", "south")).toThrow(
-      "Could not find a pending effectOptional prompt for south.",
-    );
     engine.resolveDecision("lifeTrigger", { optionId: "skip" }, "north");
-    expect(engine.pendingDecision("effectOptional", "south").steps).toHaveLength(1);
-    engine.resolveDecision("effectOptional", { optionId: "yes" }, "south");
 
     expect(engine.getView("south").players.south.deckCount).toBe(deckBefore - 7);
     expect(engine.getView("south").prompts).toHaveLength(0);

@@ -313,8 +313,16 @@ export function queueBattleLifeTriggerPrompt(
 }
 
 function enqueueBattleDamageEffects(state: MatchState, battle: NonNullable<MatchState["battle"]>) {
+  enqueueAttackerDamageEffects(state, battle);
+  enqueueDefenderDamageEffects(state, battle);
+}
+
+/** "When this ... attack deals damage" and "When you deal damage" (the attacking side). */
+function enqueueAttackerDamageEffects(
+  state: MatchState,
+  battle: NonNullable<MatchState["battle"]>,
+) {
   const attacker = getInstance(state, battle.attackerId);
-  const defendingSeat = getInstance(state, battle.targetId).controller;
   const triggerEvent = {
     instanceId: battle.attackerId,
     effectController: attacker.controller,
@@ -333,6 +341,15 @@ function enqueueBattleDamageEffects(state: MatchState, battle: NonNullable<Match
   // attacker's "when you deal damage" side before the defender's "when you
   // take damage" side already resolves the turn player's effects first.
   enqueueInPlayEffectsForTrigger(state, "whenYouDealDamage", triggerEvent, [attacker.controller]);
+}
+
+/** "When you take damage" (the defending side). */
+export function enqueueDefenderDamageEffects(
+  state: MatchState,
+  battle: NonNullable<MatchState["battle"]>,
+) {
+  const attacker = getInstance(state, battle.attackerId);
+  const defendingSeat = getInstance(state, battle.targetId).controller;
   enqueueInPlayEffectsForTrigger(
     state,
     "whenYouTakeDamage",
@@ -462,13 +479,18 @@ export function continueLeaderDamage(state: MatchState) {
       );
       return;
     }
+    // OP Practice fork fix 10 (qa_op03.pdf, OP03-040 / -041 / -043 / -047 / -051): the opponent
+    // checks their Life, then the attacking side's "when ... deals damage" effects activate, and
+    // after that the checked card's [Trigger] may be activated. The defender's "when you take
+    // damage" effects still follow the [Trigger] (qa_op13.pdf, OP13-002).
+    enqueueAttackerDamageEffects(state, battle);
     enqueueResolution(state, {
       kind: "battleLifeTriggerPrompt",
       lifeCountAfterRemoval: defender.life.length,
       battleId: battle.id,
       lifeCardId,
+      attackerEffectsFirst: true,
     });
-    enqueueBattleDamageEffects(state, battle);
     return;
   }
 
@@ -993,8 +1015,37 @@ export function beginAttack(
   // "When your opponent attacks" can only live on the defending player's
   // in-play cards, and the attacking (turn) player's [When Attacking] effects
   // enqueue above, so 8-6-1 turn-player-first ordering already holds.
-  enqueueInPlayEffectsForTrigger(state, "onOpponentAttack", attackEvent, [otherSeat(seat)]);
+  enqueueInPlayEffectsForTrigger(
+    state,
+    "onOpponentAttack",
+    attackEvent,
+    [otherSeat(seat)],
+    undefined,
+    (block) => !block.afterBlockStep,
+  );
   enqueueResolution(state, { kind: "battleBlockStep", battleId: state.battle.id });
+}
+
+/**
+ * OP Practice fork fix 10 (qa_op03.pdf, OP03-001): "When this Leader ... is attacked" activates
+ * after the Block step, against the attack's current target, so a [Blocker] that took the attack
+ * stops it. Call right before the Counter step is queued at the end of the Block step.
+ */
+export function enqueueAfterBlockStepEffects(state: MatchState) {
+  const battle = state.battle;
+  if (!battle) return;
+  enqueueInPlayEffectsForTrigger(
+    state,
+    "onOpponentAttack",
+    {
+      instanceId: battle.attackerId,
+      effectController: getInstance(state, battle.attackerId).controller,
+      targetInstanceId: battle.targetId,
+    },
+    [battle.defendingSeat],
+    undefined,
+    (block) => block.afterBlockStep === true,
+  );
 }
 
 export function resolvePrompt(
@@ -1083,6 +1134,7 @@ export function resolvePrompt(
         );
       }
       battle.step = "counter";
+      enqueueAfterBlockStepEffects(state);
       enqueueResolution(state, {
         kind: "battleCounterStep",
         battleId: battle.id,

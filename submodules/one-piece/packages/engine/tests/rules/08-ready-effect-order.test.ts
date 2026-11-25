@@ -136,7 +136,9 @@ describe("Comprehensive Rules 8-6 ready auto effects", () => {
       ).toBe(1);
     }));
 
-  test("battle damage offers Life Trigger before damage auto effects", () =>
+  // OP Practice fork fix 10 (qa_op03.pdf, OP03-040/-041/-043/-047/-051): the attacker's damage
+  // effect activates after the Life check and before the checked card's [Trigger].
+  test("battle damage resolves the attacker's damage auto effects before the Life Trigger", () =>
     syntheticCards(([a, , , life]) => {
       a.effects = {
         effects: [
@@ -152,7 +154,8 @@ describe("Comprehensive Rules 8-6 ready auto effects", () => {
       );
       engine.asSouth().attack(a, engine.leader("north"));
       engine.pendingDecision("lifeTrigger", "north");
-      expect(engine.getView("south").players.south.handCount).toBe(0);
+      expect(engine.getView("south").players.south.handCount).toBe(1);
+      expect(engine.getView("south").players.north.handCount).toBe(0);
       engine.resolveDecision("lifeTrigger", { optionId: "activate" }, "north");
       expect(engine.getView("south").players.south.handCount).toBe(1);
       expect(engine.getView("south").players.north.handCount).toBe(1);
